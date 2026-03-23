@@ -62,13 +62,8 @@ services:
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper-1:2181,zookeeper-2:2181,zookeeper-3:2181
-      KAFKA_ADVERTISED_LISTENERS: SASL_PLAINTEXT://localhost:19091
-      KAFKA_LISTENERS: SASL_PLAINTEXT://0.0.0.0:19091
-      KAFKA_SECURITY_INTER_BROKER_PROTOCOL: SASL_PLAINTEXT
-      KAFKA_SASL_MECHANISM_INTER_BROKER_PROTOCOL: PLAIN
-      KAFKA_SASL_ENABLED_MECHANISMS: PLAIN
-      KAFKA_OPTS: "-Djava.security.auth.login.config=/etc/kafka/kafka_server_jaas.conf"
-      KAFKA_ZOOKEEPER_SASL_CLIENT: "false"
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:19091
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:19091
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
       KAFKA_DEFAULT_REPLICATION_FACTOR: 3
       KAFKA_MIN_INSYNC_REPLICAS: 2
@@ -78,8 +73,6 @@ services:
       - "19091:19091"
     volumes:
       - kafka-1-data:/var/lib/kafka/data
-      - ./kafka_server_jaas.conf:/etc/kafka/kafka_server_jaas.conf:ro
-      - ./client.properties:/etc/kafka/client.properties:ro
     networks:
       - kafka-cluster
 
@@ -93,13 +86,8 @@ services:
     environment:
       KAFKA_BROKER_ID: 2
       KAFKA_ZOOKEEPER_CONNECT: zookeeper-1:2181,zookeeper-2:2181,zookeeper-3:2181
-      KAFKA_ADVERTISED_LISTENERS: SASL_PLAINTEXT://localhost:19092
-      KAFKA_LISTENERS: SASL_PLAINTEXT://0.0.0.0:19092
-      KAFKA_SECURITY_INTER_BROKER_PROTOCOL: SASL_PLAINTEXT
-      KAFKA_SASL_MECHANISM_INTER_BROKER_PROTOCOL: PLAIN
-      KAFKA_SASL_ENABLED_MECHANISMS: PLAIN
-      KAFKA_OPTS: "-Djava.security.auth.login.config=/etc/kafka/kafka_server_jaas.conf"
-      KAFKA_ZOOKEEPER_SASL_CLIENT: "false"
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:19092
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:19092
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
       KAFKA_DEFAULT_REPLICATION_FACTOR: 3
       KAFKA_MIN_INSYNC_REPLICAS: 2
@@ -109,8 +97,6 @@ services:
       - "19092:19092"
     volumes:
       - kafka-2-data:/var/lib/kafka/data
-      - ./kafka_server_jaas.conf:/etc/kafka/kafka_server_jaas.conf:ro
-      - ./client.properties:/etc/kafka/client.properties:ro
     networks:
       - kafka-cluster
 
@@ -124,13 +110,8 @@ services:
     environment:
       KAFKA_BROKER_ID: 3
       KAFKA_ZOOKEEPER_CONNECT: zookeeper-1:2181,zookeeper-2:2181,zookeeper-3:2181
-      KAFKA_ADVERTISED_LISTENERS: SASL_PLAINTEXT://localhost:19093
-      KAFKA_LISTENERS: SASL_PLAINTEXT://0.0.0.0:19093
-      KAFKA_SECURITY_INTER_BROKER_PROTOCOL: SASL_PLAINTEXT
-      KAFKA_SASL_MECHANISM_INTER_BROKER_PROTOCOL: PLAIN
-      KAFKA_SASL_ENABLED_MECHANISMS: PLAIN
-      KAFKA_OPTS: "-Djava.security.auth.login.config=/etc/kafka/kafka_server_jaas.conf"
-      KAFKA_ZOOKEEPER_SASL_CLIENT: "false"
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:19093
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:19093
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
       KAFKA_DEFAULT_REPLICATION_FACTOR: 3
       KAFKA_MIN_INSYNC_REPLICAS: 2
@@ -140,8 +121,6 @@ services:
       - "19093:19093"
     volumes:
       - kafka-3-data:/var/lib/kafka/data
-      - ./kafka_server_jaas.conf:/etc/kafka/kafka_server_jaas.conf:ro
-      - ./client.properties:/etc/kafka/client.properties:ro
     networks:
       - kafka-cluster
 
@@ -156,9 +135,6 @@ services:
       KAFKA_CLUSTERS_0_NAME: local-kafka-cluster
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka-1:19091,kafka-2:19092,kafka-3:19093
       KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper-1:2181,zookeeper-2:2181,zookeeper-3:2181
-      KAFKA_CLUSTERS_0_PROPERTIES_SECURITY_PROTOCOL: SASL_PLAINTEXT
-      KAFKA_CLUSTERS_0_PROPERTIES_SASL_MECHANISM: PLAIN
-      KAFKA_CLUSTERS_0_PROPERTIES_SASL_JAAS_CONFIG: 'org.apache.kafka.common.security.plain.PlainLoginModule required username="admin" password="Audaque@123";'
     ports:
       - "28080:8080"
     networks:
