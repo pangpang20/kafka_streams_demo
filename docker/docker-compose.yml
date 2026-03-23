@@ -62,15 +62,17 @@ services:
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper-1:2181,zookeeper-2:2181,zookeeper-3:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-1:9091
-      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9091
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-1:9091,EXTERNAL://localhost:19091
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9091,EXTERNAL://0.0.0.0:19091
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
       KAFKA_DEFAULT_REPLICATION_FACTOR: 3
       KAFKA_MIN_INSYNC_REPLICAS: 2
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
     ports:
-      - "19091:9091"
+      - "19091:19091"
     volumes:
       - kafka-1-data:/var/lib/kafka/data
     networks:
@@ -86,15 +88,17 @@ services:
     environment:
       KAFKA_BROKER_ID: 2
       KAFKA_ZOOKEEPER_CONNECT: zookeeper-1:2181,zookeeper-2:2181,zookeeper-3:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-2:9091
-      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9091
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-2:9091,EXTERNAL://localhost:19092
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9091,EXTERNAL://0.0.0.0:19092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
       KAFKA_DEFAULT_REPLICATION_FACTOR: 3
       KAFKA_MIN_INSYNC_REPLICAS: 2
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
     ports:
-      - "19092:9091"
+      - "19092:19092"
     volumes:
       - kafka-2-data:/var/lib/kafka/data
     networks:
@@ -110,15 +114,17 @@ services:
     environment:
       KAFKA_BROKER_ID: 3
       KAFKA_ZOOKEEPER_CONNECT: zookeeper-1:2181,zookeeper-2:2181,zookeeper-3:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-3:9091
-      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9091
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-3:9091,EXTERNAL://localhost:19093
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9091,EXTERNAL://0.0.0.0:19093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
       KAFKA_DEFAULT_REPLICATION_FACTOR: 3
       KAFKA_MIN_INSYNC_REPLICAS: 2
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
     ports:
-      - "19093:9091"
+      - "19093:19093"
     volumes:
       - kafka-3-data:/var/lib/kafka/data
     networks:
@@ -135,8 +141,26 @@ services:
       KAFKA_CLUSTERS_0_NAME: local-kafka-cluster
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka-1:9091,kafka-2:9091,kafka-3:9091
       KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper-1:2181,zookeeper-2:2181,zookeeper-3:2181
+      KAFKA_CLUSTERS_0_PROPERTIES_SECURITY_PROTOCOL: PLAINTEXT
     ports:
       - "28080:8080"
+    networks:
+      - kafka-cluster
+
+  oceanbase:
+    image: oceanbase/oceanbase-ce:4.3.5-lts
+    container_name: oceanbase
+    environment:
+      OB_TENANT: test
+      OB_USER: root
+      OB_PASSWORD: ""
+      OB_CLUSTER: obcluster
+    ports:
+      - "2881:2881"
+      - "2883:2883"
+    volumes:
+      - oceanbase-data:/root/obdata
+      - ./init-ob.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
       - kafka-cluster
 
@@ -150,6 +174,7 @@ volumes:
   kafka-1-data:
   kafka-2-data:
   kafka-3-data:
+  oceanbase-data:
 
 networks:
   kafka-cluster:

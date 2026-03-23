@@ -1,15 +1,15 @@
-# Kafka Streams Demo 项目
+# Kafka Streams 数据质量检查 Demo 项目
 
-本项目包含两个部分：
-1. **Producer**: CDC 数据生成器，模拟数据库变更记录
-2. **Consumer**: Kafka Streams 数据质量检查应用
+基于 Kafka Streams 实现的 CDC 数据质量检查系统，支持实时数据验证和异议数据记录。
+问题数据同时输出到 Kafka Topic (mytopic-invalid)、日志文件和 OceanBase 数据库。
 
 ## 项目结构
 
 ```
 /opt/kafka_streams_demo/
 ├── docker/                     # Docker 部署
-│   ├── docker-compose.yml      # Kafka 集群配置
+│   ├── docker-compose.yml      # Kafka 集群配置 (3 节点) + OceanBase
+│   ├── init-ob.sql             # OceanBase 初始化 SQL 脚本
 │   ├── start.sh                # 启动脚本
 │   └── stop.sh                 # 停止脚本
 ├── Producer/                   # 数据生产者
@@ -17,97 +17,503 @@
 │   ├── pom.xml                 # Maven 配置
 │   ├── start.sh                # 启动脚本
 │   └── README.md               # 使用说明
-└── Consumer/                   # 数据消费者
-    ├── src/main/java/...       # 源代码
-    ├── pom.xml                 # Maven 配置
-    ├── start.sh                # 启动脚本
-    └── README.md               # 使用说明
+├── Consumer/                   # 数据消费者
+│   ├── src/main/java/...       # 源代码
+│   ├── pom.xml                 # Maven 配置
+│   ├── start.sh                # 启动脚本
+│   └── README.md               # 使用说明
+└── README.md                   # 本文件
 ```
 
-## 快速开始
+---
 
-### 1. 启动 Kafka 集群
+## 一、环境要求
+
+- **JDK**: 1.8+
+- **Maven**: 3.6+
+- **Docker**: 20.10+
+- **Docker Compose**: 1.29+
+- **磁盘空间**: 至少 10GB (Kafka 数据目录 + OceanBase 数据目录)
+- **内存**: 至少 12GB (Kafka 集群 + OceanBase + 应用)
+
+---
+
+## 二、启动 Docker 集群 (Kafka + OceanBase)
+
+### 2.1 启动集群
 
 ```bash
 cd /opt/kafka_streams_demo/docker
 ./start.sh
 ```
 
-### 2. 创建 Topic
+**启动流程说明**:
+1. 启动 Zookeeper 集群 (3 节点) - 约 5 秒
+2. 启动 Kafka 集群 (3 节点) - 约 15 秒
+3. 启动 OceanBase 数据库 - 约 30-60 秒
+
+**启动后验证**：
 
 ```bash
-# 源 Topic
+# 检查容器状态
+docker-compose ps
+
+# 预期输出：
+#       Name                     Command               State                              Ports
+# -----------------------------------------------------------------------------------------------------------------------------
+# zookeeper-1         /etc/confluent/docker/run      Up      0.0.0.0:2181->2181/tcp
+# zookeeper-2         /etc/confluent/docker/run      Up      0.0.0.0:2182->2181/tcp
+# zookeeper-3         /etc/confluent/docker/run      Up      0.0.0.0:2183->2181/tcp
+# kafka-1             /etc/confluent/docker/run      Up      0.0.0.0:19091->19091/tcp
+# kafka-2             /etc/confluent/docker/run      Up      0.0.0.0:19092->19092/tcp
+# kafka-3             /etc/confluent/docker/run      Up      0.0.0.0:19093->19093/tcp
+# kafka-ui            /bin/sh -c kafka-ui          Up      0.0.0.0:28080->8080/tcp
+# oceanbase           /root/entrypoint.sh          Up      0.0.0.0:2881->2881/tcp
+```
+
+### 2.2 停止集群
+
+```bash
+cd /opt/kafka_streams_demo/docker
+./stop.sh
+
+# 或者
+docker-compose down
+```
+
+### 2.3 清理所有数据（重置环境）
+
+```bash
+docker-compose down -v  # -v 选项删除所有卷
+```
+
+### 2.4 集群配置详情
+
+| 组件 | 容器名 | 端口 | 说明 |
+|------|--------|------|------|
+| Zookeeper 1 | zookeeper-1 | 2181 | 集群协调 |
+| Zookeeper 2 | zookeeper-2 | 2182 | 集群协调 |
+| Zookeeper 3 | zookeeper-3 | 2183 | 集群协调 |
+| Kafka Broker 1 | kafka-1 | 19091 | 外部访问 |
+| Kafka Broker 2 | kafka-2 | 19092 | 外部访问 |
+| Kafka Broker 3 | kafka-3 | 19093 | 外部访问 |
+| Kafka UI | kafka-ui | 28080 | Web 管理界面 |
+| OceanBase | oceanbase | 2881 | MySQL 兼容模式 |
+
+**访问 Kafka UI**: http://localhost:28080
+
+**连接 OceanBase**:
+- Docker 网络内：`oceanbase:2881`
+- 宿主机访问：`localhost:2881`
+- 用户名：`root`
+- 密码：空
+- 数据库：`kafka_quality_check`
+
+---
+
+## 三、创建 Kafka Topic
+
+### 3.1 创建必需 Topic
+
+```bash
+# 源 Topic（Producer 发送，Consumer 消费）
 docker exec kafka-1 kafka-topics --bootstrap-server localhost:9091 \
   --create --topic mytopic --partitions 3 --replication-factor 3
 
-# 输出 Topic
+# 正常数据输出 Topic
 docker exec kafka-1 kafka-topics --bootstrap-server localhost:9091 \
   --create --topic mytopic-valid --partitions 3 --replication-factor 3
 
+# 异常数据输出 Topic
 docker exec kafka-1 kafka-topics --bootstrap-server localhost:9091 \
   --create --topic mytopic-invalid --partitions 3 --replication-factor 3
 ```
 
-### 3. 启动 Consumer（数据质量检查）
+### 3.2 验证 Topic 创建
+
+```bash
+# 列出所有 Topic
+docker exec kafka-1 kafka-topics --bootstrap-server localhost:9091 --list
+
+# 查看 Topic 详情
+docker exec kafka-1 kafka-topics --bootstrap-server localhost:9091 \
+  --describe --topic mytopic
+```
+
+### 3.3 验证 OceanBase 表结构
+
+```bash
+# 连接 OceanBase
+docker exec oceanbase mysql -h 127.0.0.1 -P 2881 -u root
+
+# 查看数据库
+SHOW DATABASES;
+USE kafka_quality_check;
+SHOW TABLES;
+
+# 查看表结构
+DESC invalid_data;
+DESC quality_stats;
+```
+
+---
+
+## 四、启动 Consumer (Kafka Streams 应用)
+
+### 4.1 Consumer 启动流程
+
+Consumer 使用 Kafka Streams API，启动时会：
+1. 构建处理拓扑 (Topology)
+2. 连接 Kafka 集群
+3. 加入消费者组
+4. 分配分区
+5. 开始消费和处理消息
+
+### 4.2 启动 Consumer
 
 ```bash
 cd /opt/kafka_streams_demo/Consumer
+
+# 清理之前的状态（避免 offset 冲突）
+rm -rf /tmp/kafka-streams-quality-check/*
+
+# 启动应用
 ./start.sh
 ```
 
-### 4. 启动 Producer（数据生成）
+### 4.3 Consumer 启动日志解析
+
+```
+=====================================
+Kafka Streams 数据质量检查应用
+=====================================
+Bootstrap Servers: localhost:19091,localhost:19092,localhost:19093
+Source Topic: mytopic
+Valid Data Topic: mytopic-valid
+Invalid Data Topic: mytopic-invalid
+Application ID: quality-check-app
+State Directory: /tmp/kafka-streams-quality-check
+-------------------------------------
+数据质量检查规则:
+  性别检查：开启 (允许：男，女)
+  年龄检查：开启 [0-120]
+  电话检查：开启 (正则：^1[3-9]\d{9}$)
+  血型检查：开启 (允许：A,B,O,AB)
+  信用分检查：开启 [0.0-1000.0]
+  住房面积检查：开启 (最小值：0.0)
+```
+
+### 4.4 Kafka Streams 拓扑结构
+
+```
+                    ┌─────────────────────┐
+                    │   Source: mytopic   │
+                    └──────────┬──────────┘
+                               │
+                               ▼
+                    ┌─────────────────────┐
+                    │  DataProcessor      │
+                    │  1. 认证 (Auth)     │
+                    │  2. 解析 (Parse)    │
+                    │  3. 验证 (Validate) │
+                    └──────────┬──────────┘
+                               │
+              ┌────────────────┼────────────────┐
+              ▼                ▼                ▼
+     ┌────────────────┐ ┌─────────────────┐ ┌──────────────┐
+     │ mytopic-valid  │ │ mytopic-invalid │ │  日志/统计   │
+     │ (正常数据)      │ │ (异常数据)       │ │ (打印统计)   │
+     └────────────────┘ └─────────────────┘ └──────────────┘
+```
+
+### 4.5 Consumer 进程信息
+
+```bash
+# 查看 Consumer 进程
+ps aux | grep kafka-streams-consumer
+
+# 查看 Consumer Group
+docker exec kafka-1 kafka-consumer-groups --bootstrap-server localhost:9091 \
+  --describe --group quality-check-app
+```
+
+---
+
+## 五、启动 Producer
+
+### 5.1 启动方式
 
 ```bash
 cd /opt/kafka_streams_demo/Producer
-./start.sh          # 无限运行
-./start.sh 60       # 运行 60 秒
+
+# 方式 1: 无限运行 (Ctrl+C 停止)
+./start.sh
+
+# 方式 2: 运行指定时间
+./start.sh 60    # 运行 60 秒
+
+# 方式 3: 发送指定条数
+./start.sh 100   # 发送 100 条
 ```
 
-## 数据流程
+### 5.2 Producer 配置说明
+
+| 参数 | 默认值 | 说明 |
+|------|--------|------|
+| SEND_INTERVAL_MS | 1000 | 发送间隔 (毫秒) |
+| INSERT_PROBABILITY | 50 | 插入操作概率 (%) |
+| UPDATE_PROBABILITY | 45 | 更新操作概率 (%) |
+| DELETE_PROBABILITY | 5 | 删除操作概率 (%) |
+| BAD_DATA_PROBABILITY | 10 | 问题数据概率 (%) |
+
+### 5.3 问题数据类型
+
+| 字段 | 问题类型 | 示例 |
+|------|----------|------|
+| sex | 非法枚举值 | M, F, 未知，male, 1 |
+| age | 超出范围 | -5, 150+ |
+| telephone | 格式错误 | 138123, 138abc12345 |
+| bloodtype | 非法枚举值 | A 型，C, Rh |
+| creditscore | 超出范围 | -100, 1500+ |
+| housingareas | 负数 | -100 |
+
+---
+
+## 六、监控和观察
+
+### 6.1 Web UI 监控
+
+访问 **Kafka UI**: http://localhost:28080
+
+- 查看 Topic 消息量
+- 查看 Consumer Group 状态
+- 浏览 Topic 消息内容
+
+### 6.2 命令行监控
+
+```bash
+# 查看 Topic 消息量
+docker exec kafka-1 kafka-run-class kafka.tools.GetOffsetShell \
+  --broker-list localhost:9091 --topic mytopic
+
+# 查看 Consumer Group 消费情况
+docker exec kafka-1 kafka-consumer-groups --bootstrap-server localhost:9091 \
+  --describe --group quality-check-app
+
+# 实时消费 mytopic-valid
+docker exec kafka-1 kafka-console-consumer --bootstrap-server localhost:9091 \
+  --topic mytopic-valid --from-beginning
+
+# 实时消费 mytopic-invalid
+docker exec kafka-1 kafka-console-consumer --bootstrap-server localhost:9091 \
+  --topic mytopic-invalid --from-beginning
+```
+
+### 6.3 异议数据日志
+
+```bash
+# 查看异议数据日志文件
+ls -la /opt/kafka_streams_demo/Consumer/logs/
+
+# 查看最新日志内容
+tail -f /opt/kafka_streams_demo/Consumer/logs/invalid-data-*.log
+
+# 统计错误类型
+cat /opt/kafka_streams_demo/Consumer/logs/invalid-data-*.log | \
+  grep -o '"failureSummary" : "[^"]*"' | sort | uniq -c | sort -rn
+```
+
+### 6.4 查询 OceanBase 中的问题数据
+
+```bash
+# 连接 OceanBase
+docker exec oceanbase mysql -h 127.0.0.1 -P 2881 -u root kafka_quality_check
+
+# 查看最新的问题数据
+SELECT record_key, table_name, opcode, failure_summary, log_timestamp
+FROM invalid_data
+ORDER BY log_timestamp DESC
+LIMIT 10;
+
+# 统计错误类型分布
+SELECT
+    CASE
+        WHEN failure_summary LIKE '%sex%' THEN '性别错误'
+        WHEN failure_summary LIKE '%age%' THEN '年龄错误'
+        WHEN failure_summary LIKE '%telephone%' THEN '电话错误'
+        WHEN failure_summary LIKE '%bloodtype%' THEN '血型错误'
+        WHEN failure_summary LIKE '%creditscore%' THEN '信用分错误'
+        WHEN failure_summary LIKE '%housingareas%' THEN '住房面积错误'
+        ELSE '其他错误'
+    END AS error_type,
+    COUNT(*) AS error_count
+FROM invalid_data
+GROUP BY error_type
+ORDER BY error_count DESC;
+
+# 查看每日问题数据统计
+SELECT
+    DATE(log_timestamp) AS stat_date,
+    COUNT(*) AS invalid_count
+FROM invalid_data
+GROUP BY DATE(log_timestamp)
+ORDER BY stat_date DESC;
+```
+
+### 6.5 控制台日志解读
 
 ```
-Producer --> mytopic --> Consumer (质量检查)
-                              |
-              +---------------+---------------+
-              |               |               |
-              v               v               v
-         mytopic-valid  mytopic-invalid    日志/统计
-         (正常数据)      (异常数据)
+[PASS] key=idcard:I:1234567890, opcode=I, table=baseinfo
+  → 数据通过验证
+
+[FAIL] key=idcard:U:1234567891, reason=数据质量检查失败：[sex] 性别值'M'不在允许范围内
+  → 数据验证失败，记录到 mytopic-invalid 和日志文件
+
+===== 统计：valid = 150 条 =====
+===== 统计：invalid = 25 条 =====
+  → Kafka Streams 统计信息
 ```
 
-## 质量检查规则
+---
 
-| 字段 | 规则 | 允许值 |
-|------|------|--------|
-| sex | 枚举检查 | 男，女 |
-| age | 范围检查 | 0-120 |
-| telephone | 正则检查 | 1[3-9]\d{9} |
-| bloodtype | 枚举检查 | A, B, O, AB |
-| creditscore | 范围检查 | 0-1000 |
-| housingareas | 非负检查 | >=0 |
+## 七、快速测试流程
 
-## 开发指南
+### 7.1 完整测试流程
 
-### Consumer 结构化处理流程
+```bash
+# 1. 启动 Kafka 集群
+cd /opt/kafka_streams_demo/docker && ./start.sh
 
+# 等待 30 秒确保集群就绪
+
+# 2. 创建 Topic
+docker exec kafka-1 kafka-topics --bootstrap-server localhost:9091 \
+  --create --topic mytopic --partitions 3 --replication-factor 3
+docker exec kafka-1 kafka-topics --bootstrap-server localhost:9091 \
+  --create --topic mytopic-valid --partitions 3 --replication-factor 3
+docker exec kafka-1 kafka-topics --bootstrap-server localhost:9091 \
+  --create --topic mytopic-invalid --partitions 3 --replication-factor 3
+
+# 3. 启动 Consumer (新终端)
+cd /opt/kafka_streams_demo/Consumer
+rm -rf /tmp/kafka-streams-quality-check/*
+./start.sh
+
+# 4. 启动 Producer (新终端)
+cd /opt/kafka_streams_demo/Producer
+./start.sh 60
+
+# 5. 观察结果 (新终端)
+watch -n 2 'docker exec kafka-1 kafka-run-class kafka.tools.GetOffsetShell \
+  --broker-list localhost:9091 --topic mytopic-valid,mytopic-invalid 2>/dev/null'
 ```
-1. 认证 (Authentication) - 验证数据源合法性
-2. 解析 (Parsing) - 将 JSON 解析为对象
-3. 验证 (Validation) - 执行业务规则检查
+
+### 7.2 预期结果
+
+运行 60 秒后：
+- 发送约 60 条消息
+- mytopic-valid: 约 50-55 条
+- mytopic-invalid: 约 5-10 条
+- 日志文件：`Consumer/logs/invalid-data-YYYY-MM-DD.log`
+
+---
+
+## 八、故障排查
+
+### 8.1 Kafka 集群无法启动
+
+```bash
+# 查看容器日志
+docker-compose logs kafka-1
+docker-compose logs zookeeper-1
+
+# 清理并重启
+docker-compose down -v
+docker-compose up -d
 ```
 
-**添加新验证规则**:
-1. 在 `ConsumerConfig.java` 中添加配置项
-2. 在 `DataValidator.java` 中添加验证方法
-3. 在 `validate()` 方法中调用新验证
+### 8.2 Consumer 无法连接 Kafka
 
-详细参考 `Consumer/README.md`
+```bash
+# 检查 Kafka 端口是否可访问
+telnet localhost 19091
 
-### Producer 数据生成
+# 查看 Consumer 日志
+tail -f /opt/kafka_streams_demo/Consumer/logs/app.log
+```
 
-- 插入操作：50%
-- 更新操作：45%
-- 删除操作：5%
-- 问题数据：10%
+### 8.3 Consumer Group 无法消费
 
-详细参考 `Producer/README.md`
+```bash
+# 删除 Consumer Group 重置 offset
+docker exec kafka-1 kafka-consumer-groups --bootstrap-server localhost:9091 \
+  --delete --group quality-check-app
+
+# 或者清理状态目录
+rm -rf /tmp/kafka-streams-quality-check/*
+```
+
+---
+
+## 九、开发指南
+
+### 9.1 添加新验证规则
+
+参考 `Consumer/README.md` 中的开发指南
+
+### 9.2 修改 Producer 数据生成
+
+参考 `Producer/README.md` 中的配置说明
+
+---
+
+## 十、技术栈
+
+| 组件 | 版本 | 说明 |
+|------|------|------|
+| Kafka | 2.8.2 | 消息队列 |
+| Zookeeper | 3.6.3 | 分布式协调 |
+| Kafka Streams | 2.8.2 | 流处理 |
+| Confluent Platform | 6.2.0 | Kafka 发行版 |
+| Kafka UI | latest | Web 管理界面 |
+| OceanBase | 5.7.25-OceanBase-v4.3.5.5 | MySQL 兼容模式数据库 |
+| OceanBase JDBC | 2.4.12 | OceanBase Java 客户端 |
+| HikariCP | 4.0.3 | 数据库连接池 |
+
+---
+
+## 十一、OceanBase 数据表结构
+
+### invalid_data (问题数据表)
+
+| 字段名 | 类型 | 说明 |
+|--------|------|------|
+| id | BIGINT | 主键 (自增) |
+| record_key | VARCHAR(500) | 记录主键 |
+| database_name | VARCHAR(100) | 数据库名 |
+| table_name | VARCHAR(100) | 表名 |
+| opcode | VARCHAR(10) | 操作类型 (I/U/D) |
+| failure_summary | TEXT | 失败原因汇总 |
+| error_fields | TEXT | 错误字段列表 (JSON) |
+| error_details | JSON | 详细错误信息 |
+| raw_data | JSON | 原始数据 |
+| log_timestamp | DATETIME | 日志记录时间 |
+
+### quality_stats (统计表)
+
+| 字段名 | 类型 | 说明 |
+|--------|------|------|
+| stat_date | DATE | 统计日期 |
+| stat_hour | INT | 统计小时 |
+| table_name | VARCHAR(100) | 表名 |
+| total_count | INT | 总记录数 |
+| invalid_count | INT | 问题数据数 |
+| invalid_rate | DECIMAL(5,2) | 问题数据率 |
+
+---
+
+## 十二、参考文档
+
+- [Consumer 详细文档](./Consumer/README.md)
+- [Producer 详细文档](./Producer/README.md)
+- [Kafka Streams 官方文档](https://kafka.apache.org/documentation/streams/)

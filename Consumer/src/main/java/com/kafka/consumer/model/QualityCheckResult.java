@@ -145,6 +145,65 @@ public class QualityCheckResult {
     public String getRecordKey() { return recordKey; }
     public void setRecordKey(String recordKey) { this.recordKey = recordKey; }
 
+    /**
+     * 获取错误字段列表（逗号分隔）
+     */
+    public java.util.List<String> getErrorFields() {
+        java.util.List<String> fields = new java.util.ArrayList<>();
+        for (ValidationError error : errors) {
+            if (!fields.contains(error.field)) {
+                fields.add(error.field);
+            }
+        }
+        return fields;
+    }
+
+    /**
+     * 获取错误字段 JSON 数组字符串
+     */
+    public String getErrorFieldsJson() {
+        StringBuilder sb = new StringBuilder("[");
+        java.util.List<String> fields = getErrorFields();
+        for (int i = 0; i < fields.size(); i++) {
+            if (i > 0) sb.append(",");
+            sb.append("\"").append(fields.get(i)).append("\"");
+        }
+        sb.append("]");
+        return sb.toString();
+    }
+
+    /**
+     * 获取错误详情 JSON 字符串
+     */
+    public String getErrorDetailsJson() {
+        StringBuilder sb = new StringBuilder("[");
+        for (int i = 0; i < errors.size(); i++) {
+            if (i > 0) sb.append(",");
+            ValidationError e = errors.get(i);
+            sb.append("{");
+            sb.append("\"field\":\"").append(e.field != null ? e.field : "").append("\",");
+            sb.append("\"errorType\":\"").append(e.errorType != null ? e.errorType : "").append("\",");
+            sb.append("\"message\":\"").append(e.message != null ? e.message.replace("\"", "\\\"") : "").append("\",");
+            sb.append("\"actualValue\":").append(e.actualValue != null ? "\"" + e.actualValue.toString().replace("\"", "\\\"") + "\"" : "null");
+            sb.append("}");
+        }
+        sb.append("]");
+        return sb.toString();
+    }
+
+    /**
+     * 获取失败原因汇总
+     */
+    public String getFailureSummary() {
+        StringBuilder sb = new StringBuilder("数据质量检查失败：");
+        for (int i = 0; i < errors.size(); i++) {
+            if (i > 0) sb.append("; ");
+            ValidationError e = errors.get(i);
+            sb.append("[").append(e.field).append("] ").append(e.message);
+        }
+        return sb.toString();
+    }
+
     @Override
     public String toString() {
         return String.format("QualityCheckResult{passed=%s, errors=%d, key=%s}",

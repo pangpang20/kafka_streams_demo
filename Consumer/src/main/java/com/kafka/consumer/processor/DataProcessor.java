@@ -61,6 +61,7 @@ public class DataProcessor {
     public ProcessingResult process(String key, String jsonValue) {
         ProcessingResult result = new ProcessingResult();
         result.setRecordKey(key);
+        result.setRawJson(jsonValue);  // 保存原始 JSON 数据
 
         try {
             // ============================================

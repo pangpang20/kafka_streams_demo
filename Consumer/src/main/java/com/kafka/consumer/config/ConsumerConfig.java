@@ -175,6 +175,25 @@ public class ConsumerConfig {
      */
     public static final double MIN_HOUSING_AREA = 0.0;
 
+    // ==================== OceanBase 配置 ====================
+
+    /**
+     * OceanBase JDBC URL
+     * OceanBase 使用专用的 JDBC 驱动和 URL 格式
+     * Consumer 在宿主机运行，使用 localhost:2881 连接
+     */
+    public static final String OCEANBASE_JDBC_URL = "jdbc:oceanbase://localhost:2881/kafka_quality_check?useSSL=false&useUnicode=true&characterEncoding=utf8&connectTimeout=30000&socketTimeout=60000&allowPublicKeyRetrieval=true";
+
+    /**
+     * OceanBase 用户名
+     */
+    public static final String OCEANBASE_USERNAME = "root";
+
+    /**
+     * OceanBase 密码
+     */
+    public static final String OCEANBASE_PASSWORD = "";
+
     // ==================== 获取 Streams Properties ====================
 
     /**

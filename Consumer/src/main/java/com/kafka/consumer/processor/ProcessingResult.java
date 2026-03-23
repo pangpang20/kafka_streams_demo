@@ -38,6 +38,11 @@ public class ProcessingResult {
      */
     private String message;
 
+    /**
+     * 原始 JSON 数据
+     */
+    private String rawJson;
+
     public ProcessingResult() {
         this.success = true;
     }
@@ -64,4 +69,7 @@ public class ProcessingResult {
 
     public String getMessage() { return message; }
     public void setMessage(String message) { this.message = message; }
+
+    public String getRawJson() { return rawJson; }
+    public void setRawJson(String rawJson) { this.rawJson = rawJson; }
 }

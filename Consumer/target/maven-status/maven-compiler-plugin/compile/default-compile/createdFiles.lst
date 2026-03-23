@@ -11,4 +11,5 @@ com/kafka/consumer/validator/DataValidator.class
 com/kafka/consumer/model/CdcEvent$AllFields.class
 com/kafka/consumer/model/QualityCheckResult$ValidationError.class
 com/kafka/consumer/model/CdcEvent.class
+com/kafka/consumer/stream/InvalidDataToOceanBase.class
 com/kafka/consumer/model/CdcEvent$FieldData.class

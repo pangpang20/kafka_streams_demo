@@ -49,6 +49,11 @@ public class QualityCheckTopology {
     private final InvalidDataLogger invalidDataLogger;
 
     /**
+     * OceanBase 异议数据写入器
+     */
+    private final InvalidDataToOceanBase invalidDataToOceanBase;
+
+    /**
      * Kafka Streams 实例
      */
     private KafkaStreams streams;
@@ -60,6 +65,7 @@ public class QualityCheckTopology {
         this.processor = new DataProcessor();
         this.objectMapper = new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
         this.invalidDataLogger = new InvalidDataLogger();
+        this.invalidDataToOceanBase = new InvalidDataToOceanBase();
         log.info("QualityCheckTopology 初始化完成");
     }
 
@@ -146,6 +152,8 @@ public class QualityCheckTopology {
                 log.warn("[FAIL] key={}, reason={}", key, result.getMessage());
                 // 记录异议数据到日志文件
                 invalidDataLogger.logInvalidData(result);
+                // 同时写入 OceanBase 数据库
+                invalidDataToOceanBase.logInvalidData(result);
             }
         });
 
@@ -174,8 +182,11 @@ public class QualityCheckTopology {
         // 步骤 5: 添加全局统计（可选）
         // ============================================
         // 使用 Grouped 进行计数统计
+        // 注意：先用 mapValues 将 ProcessingResult 转换为 String，避免 Serde 类型不匹配问题
         processedStream
-                .groupBy((key, result) -> result.isSuccess() ? "valid" : "invalid")
+                .mapValues(result -> result.isSuccess() ? "valid" : "invalid")
+                .groupBy((key, validOrInvalid) -> validOrInvalid,
+                        Grouped.with(Serdes.String(), Serdes.String()))
                 .count(Materialized.as("quality-check-stats"))
                 .toStream()
                 .peek((key, count) ->
@@ -226,6 +237,7 @@ public class QualityCheckTopology {
             log.info("收到关闭信号，正在停止 Streams 应用...");
             streams.close();
             invalidDataLogger.close();
+            invalidDataToOceanBase.close();
             log.info("Streams 应用已停止");
         }));
 
