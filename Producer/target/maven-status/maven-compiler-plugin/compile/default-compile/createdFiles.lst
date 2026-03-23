@@ -1,0 +1,6 @@
+com/kafka/producer/config/ProducerConfig.class
+com/kafka/producer/model/CdcEvent$FieldData.class
+com/kafka/producer/model/CdcEvent.class
+com/kafka/producer/CdcDataProducer.class
+com/kafka/producer/model/CdcEvent$DataRecord.class
+com/kafka/producer/model/CdcEvent$AllFields.class

@@ -1,0 +1,14 @@
+com/kafka/consumer/model/CdcEvent$DataRecord.class
+com/kafka/consumer/stream/InvalidDataLogger.class
+com/kafka/consumer/stream/QualityCheckTopology.class
+com/kafka/consumer/processor/DataProcessor.class
+com/kafka/consumer/processor/ProcessingResult.class
+com/kafka/consumer/KafkaStreamsQualityCheck.class
+com/kafka/consumer/config/ConsumerConfig.class
+com/kafka/consumer/model/QualityCheckResult.class
+com/kafka/consumer/stream/InvalidDataLogger$InvalidDataLogEntry.class
+com/kafka/consumer/validator/DataValidator.class
+com/kafka/consumer/model/CdcEvent$AllFields.class
+com/kafka/consumer/model/QualityCheckResult$ValidationError.class
+com/kafka/consumer/model/CdcEvent.class
+com/kafka/consumer/model/CdcEvent$FieldData.class

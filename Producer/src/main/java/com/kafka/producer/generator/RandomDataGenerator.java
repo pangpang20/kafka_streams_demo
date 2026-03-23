@@ -156,7 +156,7 @@ public class RandomDataGenerator {
 
         // regdatetime - 注册时间
         data.put("regdatetime", new CdcEvent.FieldData("io.debezium.time.Timestamp:INT64",
-                System.currentTimeMillis() - RANDOM.nextInt(31536000000L))); // 过去一年内
+                System.currentTimeMillis() - (long)RANDOM.nextInt(315360000))); // 过去一年内
 
         // updatetime - 更新时间
         data.put("updatetime", new CdcEvent.FieldData("io.debezium.time.ZonedTimestamp:STRING",
