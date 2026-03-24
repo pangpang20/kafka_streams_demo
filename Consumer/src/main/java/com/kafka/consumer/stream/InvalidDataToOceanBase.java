@@ -144,6 +144,7 @@ public class InvalidDataToOceanBase {
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
 
             conn.setAutoCommit(false);
+            log.info("获取数据库连接，autoCommit: {}", conn.getAutoCommit());
 
             for (ProcessingResult result : toFlush) {
                 addBatch(pstmt, result);
@@ -151,7 +152,7 @@ public class InvalidDataToOceanBase {
 
             pstmt.executeBatch();
             conn.commit();
-            log.info("批量写入 OceanBase 成功：{} 条记录", toFlush.size());
+            log.info("批量写入 OceanBase 成功：{} 条记录，已 commit", toFlush.size());
             log.info("===== 统计：invalid = {} 条 ===== (写入 OceanBase)", toFlush.size());
 
         } catch (SQLException e) {

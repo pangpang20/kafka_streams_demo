@@ -143,8 +143,8 @@ docker exec kafka-1 kafka-topics --bootstrap-server localhost:9091 \
 ### 3.3 验证 OceanBase 表结构
 
 ```bash
-# 连接 OceanBase
-docker exec oceanbase mysql -h 127.0.0.1 -P 2881 -u root
+# 连接 OceanBase (使用 obclient)
+docker exec oceanbase obclient -h 127.0.0.1 -P 2881 -u root
 
 # 查看数据库
 SHOW DATABASES;
@@ -326,8 +326,8 @@ cat /opt/kafka_streams_demo/Consumer/logs/invalid-data-*.log | \
 ### 6.4 查询 OceanBase 中的问题数据
 
 ```bash
-# 连接 OceanBase
-docker exec oceanbase mysql -h 127.0.0.1 -P 2881 -u root kafka_quality_check
+# 连接 OceanBase (使用 obclient)
+docker exec oceanbase obclient -h 127.0.0.1 -P 2881 -u root kafka_quality_check
 
 # 查看最新的问题数据
 SELECT record_key, table_name, opcode, failure_summary, log_timestamp
