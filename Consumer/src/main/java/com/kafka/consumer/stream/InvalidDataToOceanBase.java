@@ -98,8 +98,8 @@ public class InvalidDataToOceanBase {
      * @param result 质量检查结果
      */
     public void logInvalidData(ProcessingResult result) {
-        log.debug("logInvalidData called: key={}, success={}",
-                  result.getRecordKey(), result.isSuccess());
+        log.info("logInvalidData called: key={}, success={}",
+                 result.getRecordKey(), result.isSuccess());
 
         if (result == null || result.isSuccess()) {
             return;
@@ -107,7 +107,7 @@ public class InvalidDataToOceanBase {
 
         synchronized (buffer) {
             buffer.add(result);
-            log.debug("Buffer size: {}", buffer.size());
+            log.info("Buffer size: {}", buffer.size());
 
             // 达到批量写入阈值时提交
             if (buffer.size() >= BATCH_SIZE) {
@@ -137,17 +137,20 @@ public class InvalidDataToOceanBase {
         String sql = "INSERT INTO kafka_quality_check.invalid_data " +
                 "(record_key, record_timestamp, database_name, table_name, opcode, data_type, " +
                 "personid, idcard, name, sex, age, telephone, bloodtype, creditscore, housingareas, " +
-                "failure_summary, error_fields, error_details, log_timestamp, raw_data) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                "failure_summary, error_fields, error_fields_json, error_details, log_timestamp, raw_data) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
         try (Connection conn = dataSource.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            conn.setAutoCommit(false);
 
             for (ProcessingResult result : toFlush) {
                 addBatch(pstmt, result);
             }
 
             pstmt.executeBatch();
+            conn.commit();
             log.info("批量写入 OceanBase 成功：{} 条记录", toFlush.size());
             log.info("===== 统计：invalid = {} 条 ===== (写入 OceanBase)", toFlush.size());
 
@@ -207,10 +210,10 @@ public class InvalidDataToOceanBase {
 
         // 设置质量检查结果
         pstmt.setString(16, qualityResult != null ? qualityResult.getFailureSummary() : null);
+        pstmt.setString(17, qualityResult != null ? String.join(",", qualityResult.getErrorFields()) : null);
         pstmt.setString(18, qualityResult != null ? qualityResult.getErrorFieldsJson() : null);
         pstmt.setString(19, qualityResult != null ? qualityResult.getErrorDetailsJson() : null);
         pstmt.setTimestamp(20, Timestamp.valueOf(LocalDateTime.now()));
-        pstmt.setString(17, qualityResult != null ? String.join(",", qualityResult.getErrorFields()) : null);
 
         // 设置原始数据
         pstmt.setString(21, result.getRawJson());
