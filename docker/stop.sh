@@ -42,5 +42,5 @@ echo "  Kafka 集群已停止"
 echo "======================================"
 echo
 echo "数据卷已保留，如需删除数据请执行:"
-echo "  docker-compose -f docker-compose-sasl.yml down -v"
+echo "  docker-compose down -v"
 echo
