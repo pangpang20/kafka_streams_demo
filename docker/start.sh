@@ -33,7 +33,7 @@ sleep 20
 
 echo "  ✓ Kafka 集群已就绪"
 
-echo "[4/4] 启动 OceanBase 数据库..."
+echo "[4/5] 启动 OceanBase 数据库..."
 docker-compose up -d oceanbase
 
 # 等待 OceanBase 就绪 (轮询检测，最多 150 秒)
@@ -58,10 +58,9 @@ fi
 echo "  配置 OceanBase 密码..."
 docker exec oceanbase obclient -h 127.0.0.1 -P 2881 -u root@test -e "ALTER USER root IDENTIFIED BY 'Audaque@123';" 2>/dev/null || true
 
-# 创建数据库和表 (如果不存在)
-echo "  初始化 OceanBase 数据库..."
-docker exec oceanbase obclient -h 127.0.0.1 -P 2881 -u root@test -p'Audaque@123' -e "CREATE DATABASE IF NOT EXISTS kafka_quality_check;" 2>/dev/null || true
-docker exec oceanbase obclient -h 127.0.0.1 -P 2881 -u root@test -p'Audaque@123' kafka_quality_check < /opt/kafka_streams_demo/docker/init-ob.sql 2>/dev/null || true
+# 初始化数据库和表 (每次启动自动执行)
+echo "  初始化 OceanBase 数据库表..."
+docker exec -i oceanbase obclient -h 127.0.0.1 -P 2881 -u root@test -p'Audaque@123' < /opt/kafka_streams_demo/docker/init-ob.sql 2>/dev/null || true
 
 echo
 echo "======================================"
