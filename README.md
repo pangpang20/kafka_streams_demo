@@ -8,27 +8,51 @@
 ```
 /opt/kafka_streams_demo/
 ├── docker/                     # Docker 部署
-│   ├── docker-compose-sasl.yml # Kafka 集群配置 (3 节点) + OceanBase
+│   ├── docker-compose.yml      # Kafka 集群配置 (3 节点) + OceanBase
 │   ├── init-ob.sql             # OceanBase 初始化 SQL 脚本
 │   ├── start-sasl.sh           # 启动脚本 (SASL 认证)
 │   └── stop-sasl.sh            # 停止脚本 (SASL 认证)
-├── Producer/                   # 数据生产者
+├── Producer/                   # 数据生产者 (硬编码版本)
 │   ├── src/main/java/...       # 源代码
 │   ├── pom.xml                 # Maven 配置
 │   ├── start.sh                # 启动脚本
-│   ├── stop.sh                 # 停止脚本
 │   └── README.md               # 使用说明
-├── Consumer/                   # 数据消费者
+├── ProducerNew/                # 可配置数据生产者 (新增)
+│   ├── src/main/java/...       # 源代码
+│   ├── src/main/resources/     # 配置文件
+│   ├── pom.xml                 # Maven 配置
+│   ├── start.sh                # 启动脚本
+│   └── README.md               # 使用说明
+├── Consumer/                   # 数据消费者 (硬编码版本)
 │   ├── src/main/java/...       # 源代码
 │   ├── pom.xml                 # Maven 配置
 │   ├── start.sh                # 启动脚本
-│   ├── stop.sh                 # 停止脚本
+│   └── README.md               # 使用说明
+├── ConsumerNew/                # 可配置数据消费者 (新增)
+│   ├── src/main/java/...       # 源代码
+│   ├── src/main/resources/     # 配置文件
+│   ├── pom.xml                 # Maven 配置
+│   ├── start.sh                # 启动脚本
 │   └── README.md               # 使用说明
 ├── oceanbase/                  # OceanBase 工具
 │   ├── ob_monitor.py           # 数据监控程序
 │   └── start.sh                # 启动脚本
 └── README.md                   # 本文件
 ```
+
+---
+
+## 版本对比
+
+| 特性 | 旧版本 (Producer/Consumer) | 新版本 (ProducerNew/ConsumerNew) |
+|------|---------------------------|----------------------------------|
+| 配置方式 | Java 硬编码 | YAML 配置文件 |
+| 规则刷新 | 需要重启 | 自动刷新 (ConsumerNew) |
+| 多表支持 | 单表 | 多表配置 |
+| 建表方式 | 手动 | 自动/手动可选 |
+| 适用场景 | 固定表结构 | 通用、多变的表结构 |
+
+**推荐使用**: 新项目建议使用 ProducerNew/ConsumerNew，具有更好的灵活性和可维护性。
 
 ---
 

@@ -1,0 +1,30 @@
+# Kafka 连接配置文件（Producer）
+
+kafka:
+  # Bootstrap Servers (支持多个，逗号分隔)
+  bootstrap_servers: "localhost:19091,localhost:19092,localhost:19093"
+
+  # SASL 认证配置
+  security:
+    enabled: true
+    protocol: "SASL_PLAINTEXT"
+    mechanism: "PLAIN"
+    username: "admin"
+    password: "Audaque@123"
+
+# 生产者性能配置
+producer:
+  # 重试次数
+  retries: 3
+
+  # 批量发送大小（字节）
+  batch_size: 16384
+
+  # linger 时间（毫秒）
+  linger_ms: 1
+
+  # 缓冲区内存大小（字节）
+  buffer_memory: 33554432
+
+  # ACK 模式 (0/1/all)
+  acks: "all"

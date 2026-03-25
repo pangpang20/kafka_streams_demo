@@ -1,0 +1,131 @@
+# Producer 表结构配置文件
+# 用于定义生成数据的表结构
+
+tables:
+  # 表 1: baseinfo 人员基本信息表
+  - name: "baseinfo"
+    description: "人员基本信息表"
+
+    # 主键字段
+    primary_key: "idcard"
+
+    # Key 字段（用于 Kafka 消息 key）
+    key_fields: "idcard"
+
+    # 字段定义
+    fields:
+      - name: "personid"
+        type: "BIGINT"
+        description: "人员 ID"
+        generator: "sequence"
+        sequence_name: "personid_seq"
+
+      - name: "idcard"
+        type: "STRING"
+        description: "身份证号"
+        generator: "idcard"
+        pattern: "^(110|310|440|320)\\d{4}(19|20)\\d{2}(0[1-9]|1[0-2])(0[1-9]|[12]\\d|3[01])\\d{4}$"
+
+      - name: "name"
+        type: "STRING"
+        description: "姓名"
+        generator: "name"
+        values:
+          surnames: ["张", "王", "李", "赵", "刘", "陈", "杨", "黄", "周", "吴"]
+          names: ["伟", "芳", "娜", "敏", "静", "丽", "强", "磊", "军", "洋"]
+
+      - name: "sex"
+        type: "STRING"
+        description: "性别"
+        generator: "random"
+        values: ["男", "女"]
+        # 问题数据（用于测试）
+        bad_values: ["M", "F", "未知", "X", "", "male", "female", "1", "0"]
+        bad_probability: 10
+
+      - name: "age"
+        type: "INT"
+        description: "年龄"
+        generator: "random_int"
+        min: 18
+        max: 80
+        # 问题数据
+        bad_values: [-5, 150, 200]
+        bad_probability: 10
+
+      - name: "birthdate"
+        type: "TIMESTAMP"
+        description: "出生日期"
+        generator: "birthdate"
+
+      - name: "birthplace"
+        type: "STRING"
+        description: "出生地"
+        generator: "random_select"
+        values: ["北京", "上海", "广东", "江苏", "浙江", "山东", "河南", "河北", "湖北", "湖南"]
+
+      - name: "address"
+        type: "STRING"
+        description: "现住址"
+        generator: "random_select"
+        values: ["北京", "上海", "广东", "江苏", "浙江", "山东", "河南", "河北", "湖北", "湖南"]
+
+      - name: "telephone"
+        type: "STRING"
+        description: "电话号码"
+        generator: "phone"
+        pattern: "^1[3-9]\\d{9}$"
+        # 问题数据
+        bad_values: ["138123", "138abc12345", "12345678901"]
+        bad_probability: 10
+
+      - name: "regdatetime"
+        type: "TIMESTAMP"
+        description: "注册时间"
+        generator: "recent_timestamp"
+        days_back: 365
+
+      - name: "updatetime"
+        type: "TIMESTAMP"
+        description: "更新时间"
+        generator: "current_timestamp"
+
+      - name: "citizen"
+        type: "DECIMAL"
+        description: "是否公民"
+        generator: "constant"
+        value: 1
+
+      - name: "creditscore"
+        type: "DOUBLE"
+        description: "信用分"
+        generator: "random_double"
+        min: 300.0
+        max: 700.0
+        # 问题数据
+        bad_values: [-100.0, 1500.0]
+        bad_probability: 10
+
+      - name: "photo"
+        type: "BYTES"
+        description: "照片"
+        generator: "empty"
+
+      - name: "bloodtype"
+        type: "STRING"
+        description: "血型"
+        generator: "random_select"
+        values: ["A", "B", "O", "AB"]
+        # 问题数据
+        bad_values: ["A 型", "B 型", "C", "Rh", "", "Unknown"]
+        bad_probability: 10
+
+      - name: "housingareas"
+        type: "DECIMAL"
+        description: "住房面积"
+        generator: "random_double"
+        min: 50.0
+        max: 300.0
+        # 问题数据
+        bad_values: [-100.0]
+        bad_probability: 10

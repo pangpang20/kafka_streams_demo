@@ -1,0 +1,5 @@
+/opt/kafka_streams_demo/ProducerNew/src/main/java/com/kafka/producer/config/ProducerConnectionConfigLoader.java
+/opt/kafka_streams_demo/ProducerNew/src/main/java/com/kafka/producer/config/ProducerAppConfigLoader.java
+/opt/kafka_streams_demo/ProducerNew/src/main/java/com/kafka/producer/generator/ConfigurableDataGenerator.java
+/opt/kafka_streams_demo/ProducerNew/src/main/java/com/kafka/producer/ConfigurableProducer.java
+/opt/kafka_streams_demo/ProducerNew/src/main/java/com/kafka/producer/config/ProducerTableConfigLoader.java

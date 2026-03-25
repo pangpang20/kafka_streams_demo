@@ -1,0 +1,49 @@
+# Producer 应用配置文件
+
+app:
+  # 应用名称
+  name: "configurable-producer-app"
+
+  # 日志目录
+  log_dir: "./logs"
+
+# 发送配置
+send:
+  # 发送间隔（毫秒）
+  interval_ms: 1000
+
+  # 运行时长（秒），0 表示无限运行
+  duration_seconds: 0
+
+  # 每多少条打印一次统计
+  log_interval: 100
+
+# 操作概率配置（总和应为 100）
+operation:
+  # 插入操作概率（%）
+  insert_probability: 50
+
+  # 更新操作概率（%）
+  update_probability: 45
+
+  # 删除操作概率（%）
+  delete_probability: 5
+
+# 数据质量配置
+data_quality:
+  # 问题数据概率（%）
+  bad_data_probability: 10
+
+# 源表配置
+source:
+  # 源表名
+  table_name: "baseinfo"
+
+  # 目标 Topic 名称
+  topic: "mytopic"
+
+  # 数据库名（CDC 数据中使用）
+  database_name: "test"
+
+  # 数据库类型
+  database_type: "mysql"
