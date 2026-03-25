@@ -8,12 +8,9 @@
 ```
 /opt/kafka_streams_demo/
 ├── docker/                     # Docker 部署
-│   ├── docker-compose.yml      # Kafka 集群配置 (3 节点) + OceanBase
-│   ├── docker-compose-sasl.yml # SASL 认证版本配置
+│   ├── docker-compose-sasl.yml # Kafka 集群配置 (3 节点) + OceanBase
 │   ├── init-ob.sql             # OceanBase 初始化 SQL 脚本
-│   ├── start.sh                # 启动脚本 (无认证)
 │   ├── start-sasl.sh           # 启动脚本 (SASL 认证)
-│   ├── stop.sh                 # 停止脚本 (无认证)
 │   └── stop-sasl.sh            # 停止脚本 (SASL 认证)
 ├── Producer/                   # 数据生产者
 │   ├── src/main/java/...       # 源代码
@@ -48,14 +45,7 @@
 
 ## 二、启动 Docker 集群 (Kafka + OceanBase)
 
-### 2.1 启动集群（无 SASL 认证）
-
-```bash
-cd /opt/kafka_streams_demo/docker
-./start.sh
-```
-
-### 2.2 启动集群（SASL 认证）
+### 2.1 启动集群（SASL 认证）
 
 ```bash
 cd /opt/kafka_streams_demo/docker
@@ -95,16 +85,16 @@ docker-compose ps
 
 ```bash
 cd /opt/kafka_streams_demo/docker
-./stop.sh
+./stop-sasl.sh
 
 # 或者
-docker-compose down
+docker-compose -f docker-compose-sasl.yml down
 ```
 
 ### 2.3 清理所有数据（重置环境）
 
 ```bash
-docker-compose down -v  # -v 选项删除所有卷
+docker-compose -f docker-compose-sasl.yml down -v  # -v 选项删除所有卷
 ```
 
 ### 2.4 集群配置详情
@@ -197,7 +187,11 @@ Consumer 使用 Kafka Streams API，启动时会：
 
 ### 4.2 启动 Consumer
 
-**无 SASL 认证环境**:
+编辑 `src/main/java/com/kafka/consumer/config/ConsumerConfig.java`:
+```java
+public static final boolean ENABLE_SASL = true;  // 启用 SASL
+```
+然后重新编译并启动：
 ```bash
 cd /opt/kafka_streams_demo/Consumer
 
@@ -207,13 +201,6 @@ rm -rf /tmp/kafka-streams-quality-check/*
 # 启动应用
 ./start.sh
 ```
-
-**SASL 认证环境**:
-编辑 `src/main/java/com/kafka/consumer/config/ConsumerConfig.java`:
-```java
-public static final boolean ENABLE_SASL = true;  // 启用 SASL
-```
-然后重新编译并启动。
 
 ### 4.3 Consumer 启动日志解析
 
@@ -277,17 +264,16 @@ docker exec kafka-1 kafka-consumer-groups --bootstrap-server localhost:9091 \
 
 ### 5.1 启动方式
 
+编辑 `src/main/java/com/kafka/producer/config/ProducerConfig.java`:
+```java
+public static final boolean ENABLE_SASL = true;  // 启用 SASL
+```
+然后重新编译并启动：
 ```bash
 cd /opt/kafka_streams_demo/Producer
 
-# 方式 1: 无限运行 (Ctrl+C 停止)
-./start.sh
-
-# 方式 2: 运行指定时间
+# 无限运行 (Ctrl+C 停止)
 ./start.sh 60    # 运行 60 秒
-
-# 方式 3: 发送指定条数
-./start.sh 100   # 发送 100 条
 ```
 
 ### 5.2 Producer 配置说明
@@ -462,9 +448,9 @@ cd /opt/kafka_streams_demo/oceanbase
 
 ```bash
 # 1. 启动 Kafka 集群
-cd /opt/kafka_streams_demo/docker && ./start.sh
+cd /opt/kafka_streams_demo/docker && ./start-sasl.sh
 
-# 等待 30 秒确保集群就绪
+# 等待 90 秒确保集群就绪 (OceanBase 启动较慢)
 
 # 2. 创建 Topic
 docker exec kafka-1 kafka-topics --bootstrap-server localhost:9091 \

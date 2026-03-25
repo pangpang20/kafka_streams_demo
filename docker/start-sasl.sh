@@ -36,15 +36,12 @@ echo "  ✓ Kafka 集群已就绪"
 echo "[4/4] 启动 OceanBase 数据库..."
 docker-compose -f docker-compose-sasl.yml up -d oceanbase
 
-# 等待 OceanBase 就绪 (OceanBase 启动较慢，约需 60-90 秒)
-echo "  等待 OceanBase 数据库就绪 (约 60-90 秒)..."
-sleep 60
-
-# 检查 OceanBase 是否就绪
+# 等待 OceanBase 就绪 (轮询检测，最多 150 秒)
+echo "  等待 OceanBase 数据库就绪..."
 MAX_RETRIES=30
 RETRY_COUNT=0
 while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-    if docker exec oceanbase obclient -h 127.0.0.1 -P 28080 -u root -e "SELECT 1" > /dev/null 2>&1; then
+    if docker exec oceanbase obclient -h 127.0.0.1 -P 2881 -u root@test -p'Audaque@123' -e "SELECT 1" > /dev/null 2>&1; then
         echo "  ✓ OceanBase 数据库已就绪"
         break
     fi
