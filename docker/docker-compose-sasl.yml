@@ -161,7 +161,7 @@ services:
     environment:
       OB_TENANT: test
       OB_USER: root
-      OB_PASSWORD: ""
+      OB_PASSWORD: "Audaque@123"
       OB_CLUSTER: obcluster
     ports:
       - "2881:2881"

@@ -41,7 +41,7 @@ echo "  等待 OceanBase 数据库就绪..."
 MAX_RETRIES=30
 RETRY_COUNT=0
 while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-    if docker exec oceanbase obclient -h 127.0.0.1 -P 2881 -u root@test -p'Audaque@123' -e "SELECT 1" > /dev/null 2>&1; then
+    if docker exec oceanbase obclient -h 127.0.0.1 -P 2881 -u root@test -e "SELECT 1" > /dev/null 2>&1; then
         echo "  ✓ OceanBase 数据库已就绪"
         break
     fi
@@ -53,6 +53,15 @@ done
 if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
     echo "  ⚠ OceanBase 启动超时，请稍后检查日志：docker-compose logs oceanbase"
 fi
+
+# 设置 OceanBase 密码 (如果未设置)
+echo "  配置 OceanBase 密码..."
+docker exec oceanbase obclient -h 127.0.0.1 -P 2881 -u root@test -e "ALTER USER root IDENTIFIED BY 'Audaque@123';" 2>/dev/null || true
+
+# 创建数据库和表 (如果不存在)
+echo "  初始化 OceanBase 数据库..."
+docker exec oceanbase obclient -h 127.0.0.1 -P 2881 -u root@test -p'Audaque@123' -e "CREATE DATABASE IF NOT EXISTS kafka_quality_check;" 2>/dev/null || true
+docker exec oceanbase obclient -h 127.0.0.1 -P 2881 -u root@test -p'Audaque@123' kafka_quality_check < /opt/kafka_streams_demo/docker/init-ob.sql 2>/dev/null || true
 
 echo
 echo "======================================"
