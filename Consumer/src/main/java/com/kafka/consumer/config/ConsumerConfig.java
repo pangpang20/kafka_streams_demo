@@ -192,7 +192,7 @@ public class ConsumerConfig {
     /**
      * OceanBase 密码
      */
-    public static final String OCEANBASE_PASSWORD = "";
+    public static final String OCEANBASE_PASSWORD = "Audaque@123";
 
     // ==================== 获取 Streams Properties ====================
 
