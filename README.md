@@ -9,19 +9,27 @@
 /opt/kafka_streams_demo/
 ├── docker/                     # Docker 部署
 │   ├── docker-compose.yml      # Kafka 集群配置 (3 节点) + OceanBase
+│   ├── docker-compose-sasl.yml # SASL 认证版本配置
 │   ├── init-ob.sql             # OceanBase 初始化 SQL 脚本
-│   ├── start.sh                # 启动脚本
-│   └── stop.sh                 # 停止脚本
+│   ├── start.sh                # 启动脚本 (无认证)
+│   ├── start-sasl.sh           # 启动脚本 (SASL 认证)
+│   ├── stop.sh                 # 停止脚本 (无认证)
+│   └── stop-sasl.sh            # 停止脚本 (SASL 认证)
 ├── Producer/                   # 数据生产者
 │   ├── src/main/java/...       # 源代码
 │   ├── pom.xml                 # Maven 配置
 │   ├── start.sh                # 启动脚本
+│   ├── stop.sh                 # 停止脚本
 │   └── README.md               # 使用说明
 ├── Consumer/                   # 数据消费者
 │   ├── src/main/java/...       # 源代码
 │   ├── pom.xml                 # Maven 配置
 │   ├── start.sh                # 启动脚本
+│   ├── stop.sh                 # 停止脚本
 │   └── README.md               # 使用说明
+├── oceanbase/                  # OceanBase 工具
+│   ├── ob_monitor.py           # 数据监控程序
+│   └── start.sh                # 启动脚本
 └── README.md                   # 本文件
 ```
 
@@ -40,17 +48,29 @@
 
 ## 二、启动 Docker 集群 (Kafka + OceanBase)
 
-### 2.1 启动集群
+### 2.1 启动集群（无 SASL 认证）
 
 ```bash
 cd /opt/kafka_streams_demo/docker
 ./start.sh
 ```
 
+### 2.2 启动集群（SASL 认证）
+
+```bash
+cd /opt/kafka_streams_demo/docker
+./start-sasl.sh
+```
+
+**SASL 认证配置**:
+- 用户名：`admin`
+- 密码：`Audaque@123`
+- 安全协议：`SASL_PLAINTEXT`
+
 **启动流程说明**:
 1. 启动 Zookeeper 集群 (3 节点) - 约 5 秒
 2. 启动 Kafka 集群 (3 节点) - 约 15 秒
-3. 启动 OceanBase 数据库 - 约 30-60 秒
+3. 启动 OceanBase 数据库 - 约 60-90 秒
 
 **启动后验证**：
 
@@ -105,9 +125,15 @@ docker-compose down -v  # -v 选项删除所有卷
 **连接 OceanBase**:
 - Docker 网络内：`oceanbase:2881`
 - 宿主机访问：`localhost:2881`
-- 用户名：`root`
-- 密码：空
+- 用户名：`root@test`
+- 密码：`Audaque@123`
 - 数据库：`kafka_quality_check`
+
+**使用 obclient 连接**:
+```bash
+# 无密码方式（已设置密码）
+docker exec oceanbase obclient -h 127.0.0.1 -P 2881 -u root@test -p'Audaque@123' kafka_quality_check
+```
 
 ---
 
@@ -144,7 +170,7 @@ docker exec kafka-1 kafka-topics --bootstrap-server localhost:9091 \
 
 ```bash
 # 连接 OceanBase (使用 obclient)
-docker exec oceanbase obclient -h 127.0.0.1 -P 2881 -u root
+docker exec oceanbase obclient -h 127.0.0.1 -P 2881 -u root@test -p'Audaque@123' kafka_quality_check
 
 # 查看数据库
 SHOW DATABASES;
@@ -171,6 +197,7 @@ Consumer 使用 Kafka Streams API，启动时会：
 
 ### 4.2 启动 Consumer
 
+**无 SASL 认证环境**:
 ```bash
 cd /opt/kafka_streams_demo/Consumer
 
@@ -180,6 +207,13 @@ rm -rf /tmp/kafka-streams-quality-check/*
 # 启动应用
 ./start.sh
 ```
+
+**SASL 认证环境**:
+编辑 `src/main/java/com/kafka/consumer/config/ConsumerConfig.java`:
+```java
+public static final boolean ENABLE_SASL = true;  // 启用 SASL
+```
+然后重新编译并启动。
 
 ### 4.3 Consumer 启动日志解析
 
@@ -327,7 +361,7 @@ cat /opt/kafka_streams_demo/Consumer/logs/invalid-data-*.log | \
 
 ```bash
 # 连接 OceanBase (使用 obclient)
-docker exec oceanbase obclient -h 127.0.0.1 -P 2881 -u root kafka_quality_check
+docker exec oceanbase obclient -h 127.0.0.1 -P 2881 -u root@test -p'Audaque@123' kafka_quality_check
 
 # 查看最新的问题数据
 SELECT record_key, table_name, opcode, failure_summary, log_timestamp
@@ -360,6 +394,52 @@ GROUP BY DATE(log_timestamp)
 ORDER BY stat_date DESC;
 ```
 
+---
+
+## 七、OceanBase 数据监控程序
+
+### 7.1 启动监控程序
+
+```bash
+cd /opt/kafka_streams_demo/oceanbase
+./start.sh
+```
+
+### 7.2 功能特性
+
+- **实时监控面板** - 显示数据库状态、表列表、数据统计
+- **问题数据统计** - 按操作类型、表名、错误类型统计
+- **数据质量统计** - 显示质量检查统计数据
+- **最近问题数据** - 查看最新的问题数据记录
+- **交互模式** - 支持命令行交互操作
+- **批处理模式** - 一次性输出所有统计信息
+
+### 7.3 命令说明
+
+| 命令 | 说明 |
+|------|------|
+| `dashboard` / `d` | 显示完整监控面板 |
+| `stats` / `s` | 显示数据统计 |
+| `recent` / `r [n]` | 显示最近 n 条问题数据 |
+| `tables` / `t` | 显示表列表 |
+| `query` / `q` | 执行自定义 SQL 查询 |
+| `refresh` / `f` | 刷新当前视图 |
+| `help` / `h` | 显示帮助信息 |
+| `quit` / `exit` | 退出程序 |
+
+### 7.4 使用示例
+
+```bash
+# 交互模式（默认）
+./start.sh
+
+# 批处理模式（一次性输出）
+./start.sh -b
+
+# 查看帮助
+./start.sh -h
+```
+
 ### 6.5 控制台日志解读
 
 ```
@@ -376,7 +456,7 @@ ORDER BY stat_date DESC;
 
 ---
 
-## 七、快速测试流程
+## 八、快速测试流程
 
 ### 7.1 完整测试流程
 
@@ -418,7 +498,7 @@ watch -n 2 'docker exec kafka-1 kafka-run-class kafka.tools.GetOffsetShell \
 
 ---
 
-## 八、故障排查
+## 九、故障排查
 
 ### 8.1 Kafka 集群无法启动
 
@@ -455,7 +535,7 @@ rm -rf /tmp/kafka-streams-quality-check/*
 
 ---
 
-## 九、开发指南
+## 十、开发指南
 
 ### 9.1 添加新验证规则
 
@@ -467,7 +547,7 @@ rm -rf /tmp/kafka-streams-quality-check/*
 
 ---
 
-## 十、技术栈
+## 十一、技术栈
 
 | 组件 | 版本 | 说明 |
 |------|------|------|
@@ -482,7 +562,7 @@ rm -rf /tmp/kafka-streams-quality-check/*
 
 ---
 
-## 十一、OceanBase 数据表结构
+## 十二、OceanBase 数据表结构
 
 ### invalid_data (问题数据表)
 
@@ -512,7 +592,7 @@ rm -rf /tmp/kafka-streams-quality-check/*
 
 ---
 
-## 十二、参考文档
+## 十三、参考文档
 
 - [Consumer 详细文档](./Consumer/README.md)
 - [Producer 详细文档](./Producer/README.md)
