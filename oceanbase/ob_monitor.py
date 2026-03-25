@@ -19,7 +19,7 @@ from typing import List, Dict, Any, Optional
 
 # ==================== 配置 ====================
 
-OCEANBASE_HOST = "localhost"
+OCEANBASE_HOST = "127.0.0.1"
 OCEANBASE_PORT = "2881"
 OCEANBASE_USER = "root"
 OCEANBASE_PASSWORD = "Audaque@123"

@@ -16,7 +16,7 @@ echo "正在停止 Kafka 集群..."
 
 # 断开并停止孤立容器与网络的连接
 echo "检查并断开孤立容器的网络连接..."
-COMPOSE_SERVICES=$(docker-compose -f docker-compose-sasl.yml ps --services 2>/dev/null)
+COMPOSE_SERVICES=$(docker-compose ps --services 2>/dev/null)
 for container in $(docker network inspect docker_kafka-cluster --format '{{range .Containers}}{{.Name}} {{end}}' 2>/dev/null); do
     # 检查容器是否在当前 compose 文件定义的服务中
     if ! echo "$COMPOSE_SERVICES" | grep -qx "$container"; then
@@ -34,7 +34,7 @@ for broker_id in 1 2 3; do
     echo "  已清理 broker-${broker_id} 注册信息"
 done
 
-docker-compose -f docker-compose-sasl.yml down --remove-orphans
+docker-compose down --remove-orphans
 
 echo
 echo "======================================"

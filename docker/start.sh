@@ -19,14 +19,14 @@ echo
 
 # 启动服务
 echo "[1/3] 启动 Zookeeper 集群 (3 节点)..."
-docker-compose -f docker-compose-sasl.yml up -d zookeeper-1 zookeeper-2 zookeeper-3
+docker-compose up -d zookeeper-1 zookeeper-2 zookeeper-3
 
 echo "[2/3] 等待 Zookeeper 集群就绪..."
 sleep 5
 echo "  ✓ Zookeeper 集群已启动"
 
 echo "[3/4] 启动 Kafka 集群 (3 节点)..."
-docker-compose -f docker-compose-sasl.yml up -d kafka-1 kafka-2 kafka-3 kafka-ui
+docker-compose up -d kafka-1 kafka-2 kafka-3 kafka-ui
 
 echo "  等待 Kafka 集群就绪..."
 sleep 20
@@ -34,7 +34,7 @@ sleep 20
 echo "  ✓ Kafka 集群已就绪"
 
 echo "[4/4] 启动 OceanBase 数据库..."
-docker-compose -f docker-compose-sasl.yml up -d oceanbase
+docker-compose up -d oceanbase
 
 # 等待 OceanBase 就绪 (轮询检测，最多 150 秒)
 echo "  等待 OceanBase 数据库就绪..."
