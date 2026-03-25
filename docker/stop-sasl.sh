@@ -25,6 +25,15 @@ for container in $(docker network inspect docker_kafka-cluster --format '{{range
     fi
 done
 
+# 清理 Zookeeper 中的 broker 注册信息（防止重启时 broker 节点冲突）
+echo "清理 Zookeeper 中的 broker 注册信息..."
+for broker_id in 1 2 3; do
+    docker exec zookeeper-1 bash -c "
+        echo 'delete /brokers/ids/${broker_id}' | zookeeper-shell localhost:2181 2>/dev/null || true
+    " 2>/dev/null || true
+    echo "  已清理 broker-${broker_id} 注册信息"
+done
+
 docker-compose -f docker-compose-sasl.yml down --remove-orphans
 
 echo
