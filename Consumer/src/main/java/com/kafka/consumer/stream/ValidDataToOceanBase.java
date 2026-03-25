@@ -17,17 +17,17 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * OceanBase 异议数据写入器
+ * OceanBase 正常数据写入器
  *
- * 将质量检查失败的数据写入 OceanBase 数据库，便于后续分析和追溯。
+ * 将质量检查通过的数据写入 OceanBase 数据库。
  * 使用 HikariCP 连接池提高性能。
  *
  * @author Kafka Demo
  * @version 1.0.0
  */
-public class InvalidDataToOceanBase {
+public class ValidDataToOceanBase {
 
-    private static final Logger log = LoggerFactory.getLogger(InvalidDataToOceanBase.class);
+    private static final Logger log = LoggerFactory.getLogger(ValidDataToOceanBase.class);
 
     /**
      * 数据库连接池
@@ -47,7 +47,7 @@ public class InvalidDataToOceanBase {
     /**
      * 构造函数
      */
-    public InvalidDataToOceanBase() {
+    public ValidDataToOceanBase() {
         initializeDataSource();
     }
 
@@ -80,7 +80,7 @@ public class InvalidDataToOceanBase {
 
         try {
             dataSource = new HikariDataSource(config);
-            log.info("OceanBase 连接池初始化成功");
+            log.info("OceanBase 连接池初始化成功 (ValidData)");
 
             // 测试连接
             try (Connection conn = dataSource.getConnection()) {
@@ -93,25 +93,20 @@ public class InvalidDataToOceanBase {
     }
 
     /**
-     * 写入异议数据
+     * 写入正常数据
      *
      * @param result 质量检查结果
      */
-    public void logInvalidData(ProcessingResult result) {
-        log.info("logInvalidData called: key={}, success={}",
-                 result.getRecordKey(), result.isSuccess());
-
-        if (result == null || result.isSuccess()) {
+    public void logValidData(ProcessingResult result) {
+        if (result == null || !result.isSuccess()) {
             return;
         }
 
         synchronized (buffer) {
             buffer.add(result);
-            log.info("Buffer size: {}", buffer.size());
 
             // 达到批量写入阈值时提交
             if (buffer.size() >= BATCH_SIZE) {
-                log.info("触发批量写入，buffer size: {}", buffer.size());
                 flushBuffer();
             }
         }
@@ -132,31 +127,31 @@ public class InvalidDataToOceanBase {
             buffer.clear();
         }
 
-        log.info("准备批量写入 {} 条记录到 OceanBase", toFlush.size());
+        log.info("准备批量写入 {} 条记录到 OceanBase (valid_data)", toFlush.size());
 
-        String sql = "INSERT INTO kafka_quality_check.invalid_data " +
+        String sql = "INSERT INTO kafka_quality_check.valid_data " +
                 "(record_key, record_timestamp, database_name, table_name, opcode, data_type, " +
                 "personid, idcard, name, sex, age, telephone, bloodtype, creditscore, housingareas, " +
-                "failure_summary, error_fields, error_details, log_timestamp, raw_data) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                "log_timestamp, raw_data) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
         try (Connection conn = dataSource.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
 
+            log.info("获取数据库连接：{}", conn.getCatalog());
             conn.setAutoCommit(false);
-            log.info("获取数据库连接：{}, autoCommit: {}", conn.getCatalog(), conn.getAutoCommit());
 
             for (ProcessingResult result : toFlush) {
                 addBatch(pstmt, result);
             }
 
-            pstmt.executeBatch();
+            int[] results = pstmt.executeBatch();
             conn.commit();
-            log.info("批量写入 OceanBase 成功：{} 条记录，已 commit", toFlush.size());
-            log.info("===== 统计：invalid = {} 条 ===== (写入 OceanBase)", toFlush.size());
+            log.info("批量写入 OceanBase 成功：{} 条记录 (valid_data), 结果：{}", toFlush.size(), java.util.Arrays.toString(results));
+            log.info("===== 统计：valid = {} 条 ===== (写入 OceanBase)", toFlush.size());
 
         } catch (SQLException e) {
-            log.error("批量写入 OceanBase 失败：{}", e.getMessage(), e);
+            log.error("批量写入 OceanBase 失败 (valid_data)：{}", e.getMessage(), e);
             // 写入失败时，将数据添加到缓冲区尾部，避免丢失
             synchronized (buffer) {
                 buffer.addAll(0, toFlush);
@@ -209,14 +204,10 @@ public class InvalidDataToOceanBase {
         pstmt.setObject(14, creditscore != null ? Double.valueOf(creditscore.toString()) : null);
         pstmt.setObject(15, housingareas != null ? Double.valueOf(housingareas.toString()) : null);
 
-        // 设置质量检查结果
-        pstmt.setString(16, qualityResult != null ? qualityResult.getFailureSummary() : null);
-        pstmt.setString(17, qualityResult != null ? String.join(",", qualityResult.getErrorFields()) : null);
-        pstmt.setString(18, qualityResult != null ? qualityResult.getErrorDetailsJson() : null);
-        pstmt.setTimestamp(19, Timestamp.valueOf(LocalDateTime.now()));
+        pstmt.setTimestamp(16, Timestamp.valueOf(LocalDateTime.now()));
 
         // 设置原始数据
-        pstmt.setString(20, result.getRawJson());
+        pstmt.setString(17, result.getRawJson());
 
         // 添加到批处理
         pstmt.addBatch();
@@ -248,7 +239,7 @@ public class InvalidDataToOceanBase {
 
         if (dataSource != null && !dataSource.isClosed()) {
             dataSource.close();
-            log.info("OceanBase 连接池已关闭");
+            log.info("OceanBase 连接池已关闭 (ValidData)");
         }
     }
 }

@@ -54,6 +54,11 @@ public class QualityCheckTopology {
     private final InvalidDataToOceanBase invalidDataToOceanBase;
 
     /**
+     * OceanBase 正常数据写入器
+     */
+    private final ValidDataToOceanBase validDataToOceanBase;
+
+    /**
      * Kafka Streams 实例
      */
     private KafkaStreams streams;
@@ -66,6 +71,7 @@ public class QualityCheckTopology {
         this.objectMapper = new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
         this.invalidDataLogger = new InvalidDataLogger();
         this.invalidDataToOceanBase = new InvalidDataToOceanBase();
+        this.validDataToOceanBase = new ValidDataToOceanBase();
         log.info("QualityCheckTopology 初始化完成");
     }
 
@@ -148,6 +154,8 @@ public class QualityCheckTopology {
                         key,
                         result.getRecord() != null ? result.getRecord().getOpcode() : "N/A",
                         result.getRecord() != null ? result.getRecord().getTablename() : "N/A");
+                // 写入正常数据到 OceanBase 数据库
+                validDataToOceanBase.logValidData(result);
             } else {
                 log.warn("[FAIL] key={}, reason={}", key, result.getMessage());
                 // 记录异议数据到日志文件
@@ -238,6 +246,7 @@ public class QualityCheckTopology {
             streams.close();
             invalidDataLogger.close();
             invalidDataToOceanBase.close();
+            validDataToOceanBase.close();
             log.info("Streams 应用已停止");
         }));
 
