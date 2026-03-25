@@ -31,7 +31,7 @@ public class ProducerConfig {
      * 是否启用 SASL 认证
      * 如需启用认证，将此值改为 true
      */
-    public static final boolean ENABLE_SASL = false;
+    public static final boolean ENABLE_SASL = true;
 
     /**
      * SASL 安全协议
@@ -52,12 +52,6 @@ public class ProducerConfig {
             "org.apache.kafka.common.security.plain.PlainLoginModule required " +
             "username=\"admin\" " +
             "password=\"Audaque@123\";";
-
-    /**
-     * SASL 登录回调处理类
-     */
-    public static final String SASL_LOGIN_CALLBACK_HANDLER_CLASS =
-            "org.apache.kafka.common.security.plain.PlainLoginModule";
 
     // ==================== Producer 性能配置 ====================
 
@@ -243,7 +237,6 @@ public class ProducerConfig {
             props.put("security.protocol", SECURITY_PROTOCOL);
             props.put("sasl.mechanism", SASL_MECHANISM);
             props.put("sasl.jaas.config", SASL_JAAS_CONFIG);
-            props.put("sasl.login.callback.handler.class", SASL_LOGIN_CALLBACK_HANDLER_CLASS);
         }
 
         return props;

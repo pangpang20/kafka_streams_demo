@@ -54,7 +54,7 @@ sleep 60
 MAX_RETRIES=30
 RETRY_COUNT=0
 while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-    if docker exec oceanbase mysql -h 127.0.0.1 -P 2881 -u root -e "SELECT 1" > /dev/null 2>&1; then
+    if docker exec oceanbase obclient -h 127.0.0.1 -P 2881 -u root -e "SELECT 1" > /dev/null 2>&1; then
         echo "  ✓ OceanBase 数据库已就绪"
         break
     fi

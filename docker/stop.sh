@@ -13,13 +13,26 @@ echo "======================================"
 echo
 
 echo "正在停止 Kafka 集群..."
-docker-compose down
+
+# 断开并停止孤立容器（如 mysql）与网络的连接
+echo "检查并断开孤立容器的网络连接..."
+COMPOSE_SERVICES=$(docker-compose ps --services 2>/dev/null)
+for container in $(docker network inspect docker_kafka-cluster --format '{{range .Containers}}{{.Name}} {{end}}' 2>/dev/null); do
+    # 检查容器是否在当前 compose 文件定义的服务中
+    if ! echo "$COMPOSE_SERVICES" | grep -qx "$container"; then
+        echo "  断开孤立容器：$container"
+        docker network disconnect -f docker_kafka-cluster "$container" 2>/dev/null || true
+    fi
+done
+
+docker-compose down --remove-orphans
 
 echo
 echo "======================================"
 echo "  Kafka 集群已停止"
 echo "======================================"
 echo
+
 echo "数据卷已保留，如需删除数据请执行:"
 echo "  docker-compose down -v"
 echo

@@ -155,6 +155,23 @@ services:
     networks:
       - kafka-cluster
 
+  oceanbase:
+    image: oceanbase/oceanbase-ce:4.3.5-lts
+    container_name: oceanbase
+    environment:
+      OB_TENANT: test
+      OB_USER: root
+      OB_PASSWORD: ""
+      OB_CLUSTER: obcluster
+    ports:
+      - "2881:2881"
+      - "2883:2883"
+    volumes:
+      - oceanbase-data:/root/obdata
+      - ./init-ob.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - kafka-cluster
+
 volumes:
   zookeeper-1-data:
   zookeeper-1-logs:
@@ -165,6 +182,7 @@ volumes:
   kafka-1-data:
   kafka-2-data:
   kafka-3-data:
+  oceanbase-data:
 
 networks:
   kafka-cluster:

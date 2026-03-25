@@ -25,13 +25,37 @@ echo "[2/3] 等待 Zookeeper 集群就绪..."
 sleep 5
 echo "  ✓ Zookeeper 集群已启动"
 
-echo "[3/3] 启动 Kafka 集群 (3 节点)..."
+echo "[3/4] 启动 Kafka 集群 (3 节点)..."
 docker-compose -f docker-compose-sasl.yml up -d kafka-1 kafka-2 kafka-3 kafka-ui
 
 echo "  等待 Kafka 集群就绪..."
 sleep 20
 
 echo "  ✓ Kafka 集群已就绪"
+
+echo "[4/4] 启动 OceanBase 数据库..."
+docker-compose -f docker-compose-sasl.yml up -d oceanbase
+
+# 等待 OceanBase 就绪 (OceanBase 启动较慢，约需 60-90 秒)
+echo "  等待 OceanBase 数据库就绪 (约 60-90 秒)..."
+sleep 60
+
+# 检查 OceanBase 是否就绪
+MAX_RETRIES=30
+RETRY_COUNT=0
+while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+    if docker exec oceanbase obclient -h 127.0.0.1 -P 28080 -u root -e "SELECT 1" > /dev/null 2>&1; then
+        echo "  ✓ OceanBase 数据库已就绪"
+        break
+    fi
+    echo "  等待 OceanBase 启动中... ($((RETRY_COUNT + 1))/$MAX_RETRIES)"
+    sleep 5
+    RETRY_COUNT=$((RETRY_COUNT + 1))
+done
+
+if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
+    echo "  ⚠ OceanBase 启动超时，请稍后检查日志：docker-compose logs oceanbase"
+fi
 
 echo
 echo "======================================"
@@ -56,6 +80,18 @@ echo "│                                                              │"
 echo "│  【Web UI 管理界面】                                         │"
 echo "│  http://localhost:28080                                     │"
 echo "│  或：http://$HOST_IP:28080                                  │"
+echo "│                                                              │"
+echo "│  【OceanBase 数据库】                                        │"
+echo "│  Host: oceanbase:2881 (Docker 网络内)                       │"
+echo "│  Host: localhost:2881 (宿主机访问)                          │"
+echo "│  User: root                                                 │"
+echo "│  Database: kafka_quality_check                              │"
+echo "│  注意：OceanBase 启动较慢，请耐心等待                         │"
+echo "│                                                              │"
+echo "│  【节点信息】                                                │"
+echo "│  Kafka Node 1: localhost:19091 (Broker ID: 1)               │"
+echo "│  Kafka Node 2: localhost:19092 (Broker ID: 2)               │"
+echo "│  Kafka Node 3: localhost:19093 (Broker ID: 3)               │"
 echo "└─────────────────────────────────────────────────────────────┘"
 echo
 

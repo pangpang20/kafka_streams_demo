@@ -60,7 +60,7 @@ public class ConsumerConfig {
      * 是否启用 SASL 认证
      * 如需启用认证，将此值改为 true
      */
-    public static final boolean ENABLE_SASL = false;
+    public static final boolean ENABLE_SASL = true;
 
     /**
      * SASL 安全协议
