@@ -186,8 +186,9 @@ public class ConsumerConfig {
 
     /**
      * OceanBase 用户名
+     * OceanBase 需要使用租户名格式：user@tenant
      */
-    public static final String OCEANBASE_USERNAME = "root";
+    public static final String OCEANBASE_USERNAME = "root@test";
 
     /**
      * OceanBase 密码
