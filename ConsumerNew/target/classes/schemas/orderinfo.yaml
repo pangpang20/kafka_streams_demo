@@ -1,0 +1,21 @@
+# orderinfo 表结构配置
+tables:
+  - name: "orderinfo"
+    description: "订单信息表"
+    fields:
+      - name: "orderid"
+        type: "BIGINT"
+        nullable: false
+        isPrimaryKey: true
+      - name: "userid"
+        type: "STRING"
+        nullable: false
+      - name: "amount"
+        type: "DOUBLE"
+        nullable: true
+      - name: "status"
+        type: "STRING"
+        nullable: true
+      - name: "createtime"
+        type: "TIMESTAMP"
+        nullable: true

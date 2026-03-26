@@ -610,8 +610,152 @@ rm -rf /tmp/kafka-streams-quality-check/*
 
 ---
 
-## 十三、参考文档
+## 十三、ConsumerNew 使用说明（推荐）
+
+### 13.1 特性
+
+- **完全可配置**：所有配置通过 YAML 文件管理，无需修改代码
+- **动态规则刷新**：验证规则修改后自动生效，无需重启应用（5 秒内检测）
+- **命令行参数**：支持启动时指定 Topic 和配置文件路径
+- **多表自动识别**：支持同一个 Topic 中多个表的数据，自动识别并路由
+- **目录式配置加载**：支持从目录自动加载所有表的配置和规则
+- **灵活输出**：可选择是否写入 Kafka Topic 和 OceanBase 数据库
+- **自动建表**：支持自动在 OceanBase 中创建目标表
+
+### 13.2 命令行参数
+
+| 参数 | 简写 | 说明 |
+|------|------|------|
+| `--topic` | `-t` | 指定 Kafka Topic（一个 topic 对应一个表） |
+| `--config-dir` | `-c` | 指定配置目录，自动加载 `schemas/` 和 `rules/` |
+| `--schema` | `-s` | 指定表结构配置文件 |
+| `--rules` | `-r` | 指定验证规则配置文件 |
+| `--help` | `-h` | 显示帮助信息 |
+
+### 13.3 启动方式
+
+**方式 1：指定配置目录（推荐）**
+```bash
+cd /opt/kafka_streams_demo/ConsumerNew
+
+# 编译
+mvn clean package
+
+# 启动（使用默认资源目录）
+./start.sh --topic mytopic --config-dir src/main/resources
+
+# 或使用外部配置目录
+./start.sh --topic mytopic --config-dir /path/to/config
+```
+
+**方式 2：分别指定文件**
+```bash
+./start.sh --schema /path/to/baseinfo.yaml --rules /path/to/baseinfo-rules.yaml
+```
+
+**方式 3：使用默认配置**
+```bash
+./start.sh
+```
+
+### 13.4 配置目录结构
+
+```
+config/
+├── schemas/                  # 表结构配置目录（自动加载所有 YAML）
+│   ├── baseinfo.yaml         # baseinfo 表结构
+│   ├── orderinfo.yaml        # orderinfo 表结构
+│   └── ...                   # 更多表配置
+└── rules/                    # 验证规则配置目录（自动加载所有 YAML）
+    ├── baseinfo-rules.yaml   # baseinfo 表验证规则
+    ├── orderinfo-rules.yaml  # orderinfo 表验证规则
+    └── ...                   # 更多规则配置
+```
+
+### 13.5 示例配置
+
+**表结构配置** (`schemas/baseinfo.yaml`):
+```yaml
+tables:
+  - name: "baseinfo"
+    description: "人员基本信息表"
+    fields:
+      - name: "personid"
+        type: "BIGINT"
+        nullable: true
+      - name: "idcard"
+        type: "STRING"
+        nullable: false
+        isPrimaryKey: true
+      - name: "name"
+        type: "STRING"
+        nullable: true
+      - name: "sex"
+        type: "STRING"
+        nullable: true
+      - name: "age"
+        type: "INT"
+        nullable: true
+```
+
+**验证规则配置** (`rules/baseinfo-rules.yaml`):
+```yaml
+tables:
+  - name: "baseinfo"
+    rules:
+      - field: "sex"
+        type: "enum"
+        enabled: true
+        values: ["男", "女"]
+      - field: "age"
+        type: "range"
+        enabled: true
+        min_value: 0
+        max_value: 120
+      - field: "telephone"
+        type: "regex"
+        enabled: true
+        pattern: "^1[3-9]\\d{9}$"
+```
+
+### 13.6 动态规则刷新
+
+修改规则文件后，应用会在 5 秒内自动检测并重新加载，无需重启：
+
+```
+INFO  检测到配置文件变化，重新加载规则...
+INFO  验证规则已更新，共 1 个表配置
+```
+
+### 13.7 新增表 D 的流程
+
+当 Producer 新增一个表 D 时：
+1. 在 `schemas/` 目录添加 `dinfo.yaml` 定义表结构
+2. 在 `rules/` 目录添加 `dinfo-rules.yaml` 定义验证规则
+3. Consumer 自动检测到新表，加载配置并创建验证器
+4. **无需重启应用**（配置支持动态刷新）
+
+日志示例：
+```
+INFO  检测到新表：dinfo, 自动注册并创建验证器
+INFO  检测到表结构配置文件变化，重新加载...
+INFO  从目录加载规则完成：3 个表配置
+INFO  注册新表：dinfo, 字段数：8
+```
+
+### 13.8 输出说明
+
+| 数据类型 | 写入 Topic | 写入 OceanBase 表 |
+|----------|-----------|-----------------|
+| 正常数据 | `mytopic-valid` | `baseinfo` (原表名) |
+| 异议数据 | `mytopic-invalid` | `e_baseinfo` (前缀 + 表名) |
+
+---
+
+## 十四、参考文档
 
 - [Consumer 详细文档](./Consumer/README.md)
+- [ConsumerNew 详细文档](./ConsumerNew/README.md)
 - [Producer 详细文档](./Producer/README.md)
+- [ProducerNew 详细文档](./ProducerNew/README.md)
 - [Kafka Streams 官方文档](https://kafka.apache.org/documentation/streams/)
