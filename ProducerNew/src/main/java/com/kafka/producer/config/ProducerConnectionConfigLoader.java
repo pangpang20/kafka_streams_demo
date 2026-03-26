@@ -14,6 +14,7 @@ import java.util.Properties;
  * @author Kafka Demo
  * @version 1.0.0
  */
+@com.fasterxml.jackson.annotation.JsonIgnoreProperties(ignoreUnknown = true)
 public class ProducerConnectionConfigLoader {
 
     private static final Logger log = LoggerFactory.getLogger(ProducerConnectionConfigLoader.class);
@@ -81,21 +82,35 @@ public class ProducerConnectionConfigLoader {
     public void loadConfig(String configPath) {
         try {
             ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
+            // 启用 snake_case 命名策略
+            mapper.setPropertyNamingStrategy(com.fasterxml.jackson.databind.PropertyNamingStrategies.SNAKE_CASE);
             File configFile = new File(configPath);
 
             if (!configFile.exists()) {
                 throw new RuntimeException("配置文件不存在：" + configPath);
             }
 
-            ProducerConnectionConfigLoader loaded = mapper.readValue(configFile, ProducerConnectionConfigLoader.class);
-            this.kafka = loaded.kafka;
-            this.producer = loaded.producer;
+            // 使用内部类来避免递归调用构造函数
+            InternalConfig internal = mapper.readValue(configFile, InternalConfig.class);
+            this.kafka = internal.kafka;
+            this.producer = internal.producer;
 
             log.info("连接配置加载成功：{}", configPath);
         } catch (Exception e) {
             log.error("加载连接配置失败：{}", e.getMessage(), e);
             throw new RuntimeException("加载连接配置失败", e);
         }
+    }
+
+    // 内部类，用于 Jackson 反序列化
+    private static class InternalConfig {
+        private KafkaConfig kafka;
+        private ProducerConfig producer;
+
+        public KafkaConfig getKafka() { return kafka; }
+        public void setKafka(KafkaConfig kafka) { this.kafka = kafka; }
+        public ProducerConfig getProducer() { return producer; }
+        public void setProducer(ProducerConfig producer) { this.producer = producer; }
     }
 
     public KafkaConfig getKafka() { return kafka; }

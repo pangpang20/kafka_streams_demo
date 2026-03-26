@@ -30,7 +30,7 @@ tables:
         type: "STRING"
         description: "姓名"
         generator: "name"
-        values_map:
+        values:
           surnames: ["张", "王", "李", "赵", "刘", "陈", "杨", "黄", "周", "吴"]
           names: ["伟", "芳", "娜", "敏", "静", "丽", "强", "磊", "军", "洋"]
 

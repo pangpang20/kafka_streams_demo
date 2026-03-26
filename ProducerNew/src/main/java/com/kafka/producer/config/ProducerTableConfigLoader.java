@@ -2,6 +2,7 @@ package com.kafka.producer.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,6 +48,7 @@ public class ProducerTableConfigLoader {
         private String description;
         private String generator;
         private List<String> values;
+        @JsonProperty("values_map")
         private Map<String, Object> valuesMap;  // for surnames/names
         private Integer min;
         private Integer max;
@@ -56,7 +58,9 @@ public class ProducerTableConfigLoader {
         private String sequenceName;
         private Object value;  // for constant generator
         private Integer daysBack;  // for recent_timestamp
+        @JsonProperty("bad_values")
         private List<Object> badValues;
+        @JsonProperty("bad_probability")
         private Integer badProbability;
 
         public String getName() { return name; }
@@ -104,20 +108,31 @@ public class ProducerTableConfigLoader {
     public void loadConfig(String configPath) {
         try {
             ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
+            // 启用 snake_case 命名策略
+            mapper.setPropertyNamingStrategy(com.fasterxml.jackson.databind.PropertyNamingStrategies.SNAKE_CASE);
             File configFile = new File(configPath);
 
             if (!configFile.exists()) {
                 throw new RuntimeException("配置文件不存在：" + configPath);
             }
 
-            ProducerTableConfigLoader loaded = mapper.readValue(configFile, ProducerTableConfigLoader.class);
-            this.tables = loaded.tables;
+            // 使用内部类来避免递归调用构造函数
+            InternalConfig internal = mapper.readValue(configFile, InternalConfig.class);
+            this.tables = internal.tables;
 
             log.info("表结构配置加载成功：{}", configPath);
         } catch (Exception e) {
             log.error("加载表结构配置失败：{}", e.getMessage(), e);
             throw new RuntimeException("加载表结构配置失败", e);
         }
+    }
+
+    // 内部类，用于 Jackson 反序列化
+    private static class InternalConfig {
+        private List<TableConfig> tables;
+
+        public List<TableConfig> getTables() { return tables; }
+        public void setTables(List<TableConfig> tables) { this.tables = tables; }
     }
 
     public List<TableConfig> getTables() { return tables; }

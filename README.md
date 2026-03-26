@@ -10,8 +10,8 @@
 ├── docker/                     # Docker 部署
 │   ├── docker-compose.yml      # Kafka 集群配置 (3 节点) + OceanBase
 │   ├── init-ob.sql             # OceanBase 初始化 SQL 脚本
-│   ├── start-sasl.sh           # 启动脚本 (SASL 认证)
-│   └── stop-sasl.sh            # 停止脚本 (SASL 认证)
+│   ├── start.sh                # 启动脚本 (SASL 认证)
+│   └── stop.sh                 # 停止脚本 (SASL 认证)
 ├── Producer/                   # 数据生产者 (硬编码版本)
 │   ├── src/main/java/...       # 源代码
 │   ├── pom.xml                 # Maven 配置
@@ -81,7 +81,7 @@
 
 ```bash
 cd /opt/kafka_streams_demo/docker
-./start-sasl.sh
+./start.sh
 ```
 
 **SASL 认证配置**:
@@ -117,16 +117,16 @@ docker-compose ps
 
 ```bash
 cd /opt/kafka_streams_demo/docker
-./stop-sasl.sh
+./stop.sh
 
 # 或者
-docker-compose -f docker-compose-sasl.yml down
+docker-compose -f docker-compose.yml down
 ```
 
 ### 2.3 清理所有数据（重置环境）
 
 ```bash
-docker-compose -f docker-compose-sasl.yml down -v  # -v 选项删除所有卷
+docker-compose -f docker-compose.yml down -v  # -v 选项删除所有卷
 ```
 
 ### 2.4 集群配置详情
@@ -480,7 +480,7 @@ cd /opt/kafka_streams_demo/oceanbase
 
 ```bash
 # 1. 启动 Kafka 集群
-cd /opt/kafka_streams_demo/docker && ./start-sasl.sh
+cd /opt/kafka_streams_demo/docker && ./start.sh
 
 # 等待 90 秒确保集群就绪 (OceanBase 启动较慢)
 
@@ -749,6 +749,141 @@ INFO  注册新表：dinfo, 字段数：8
 |----------|-----------|-----------------|
 | 正常数据 | `mytopic-valid` | `baseinfo` (原表名) |
 | 异议数据 | `mytopic-invalid` | `e_baseinfo` (前缀 + 表名) |
+
+---
+
+## 十三、ProducerNew 使用说明（推荐）
+
+### 13.1 特性
+
+- **完全可配置**：所有配置通过 YAML 文件管理
+- **多表多 Topic 支持**：配置多个表，每个表发送到不同的 Topic
+- **Topic 自动创建**：启动时自动检查并创建不存在的 Topic
+- **数据生成器**：支持多种内置生成器（序列、身份证、姓名、电话等）
+- **问题数据注入**：可配置概率生成问题数据用于测试
+
+### 13.2 配置文件
+
+ProducerNew 有三个配置文件，位于 `src/main/resources/` 目录：
+
+| 文件 | 说明 |
+|------|------|
+| `connection-config.yaml` | Kafka 连接配置 |
+| `app-config.yaml` | 应用配置（多表映射、Topic 自动创建参数） |
+| `table-schema.yaml` | 表结构配置和数据生成规则 |
+
+### 13.3 多表配置示例
+
+在 `app-config.yaml` 中配置多个表：
+
+```yaml
+topic:
+  auto_create: true          # 是否自动创建 Topic
+  partitions: 3              # 默认分区数
+  replication_factor: 3      # 默认副本数
+
+tables:
+  - table_name: "baseinfo"
+    topic: "mytopic"
+    database_name: "test"
+    database_type: "mysql"
+    enabled: true
+    interval_ms: 1000        # 该表的发送间隔
+
+  - table_name: "orderinfo"
+    topic: "order-topic"
+    database_name: "test"
+    database_type: "mysql"
+    enabled: true
+    interval_ms: 500
+```
+
+### 13.4 启动方式
+
+```bash
+cd /opt/kafka_streams_demo/ProducerNew
+
+# 编译
+mvn clean package
+
+# 启动（使用默认配置路径）
+./start.sh
+
+# 指定配置文件路径
+./start.sh /path/to/config
+
+# 运行 60 秒后自动停止
+./start.sh 60
+```
+
+### 13.5 命令行参数
+
+| 参数 | 说明 | 默认值 |
+|------|------|--------|
+| `configPath` | 配置文件路径 | `src/main/resources` |
+
+### 13.6 配置目录结构
+
+ProducerNew 的配置支持两种方式：
+
+**方式 1：单文件配置（默认）**
+```
+src/main/resources/
+├── connection-config.yaml
+├── app-config.yaml
+└── table-schema.yaml      # 包含所有表的配置
+```
+
+**方式 2：目录式配置**
+```
+config/
+├── connection-config.yaml
+├── app-config.yaml
+└── schemas/               # 表结构配置目录
+    ├── baseinfo.yaml
+    └── orderinfo.yaml
+```
+
+### 13.7 数据生成器类型
+
+| 生成器 | 说明 | 配置参数 |
+|--------|------|----------|
+| sequence | 序列生成 | sequence_name |
+| idcard | 身份证号 | - |
+| name | 姓名 | values.surnames, values.names |
+| random | 随机选择 | values |
+| random_int | 随机整数 | min, max |
+| random_double | 随机小数 | minDouble, maxDouble |
+| phone | 电话号码 | - |
+| current_timestamp | 当前时间戳 | - |
+
+### 13.8 问题数据配置
+
+在字段配置中设置 `bad_values` 和 `bad_probability`：
+
+```yaml
+- name: "sex"
+  type: "STRING"
+  generator: "random"
+  values: ["男", "女"]
+  bad_values: ["M", "F", "未知"]
+  bad_probability: 10  # 10% 概率生成问题数据
+```
+
+### 13.9 Topic 自动创建
+
+启动时自动检查并创建 Topic：
+
+```
+INFO  Topic 已存在：mytopic
+INFO  Topic 创建成功：order-topic (partitions=3, replicationFactor=3)
+```
+
+如需关闭自动创建，设置：
+```yaml
+topic:
+  auto_create: false
+```
 
 ---
 

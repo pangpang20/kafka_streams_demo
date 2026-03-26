@@ -34,7 +34,33 @@ data_quality:
   # 问题数据概率（%）
   bad_data_probability: 10
 
-# 源表配置
+# Topic 自动创建配置
+topic:
+  # 是否自动创建 topic
+  auto_create: true
+  # 默认分区数
+  partitions: 3
+  # 默认副本数
+  replication_factor: 3
+
+# 多表配置（支持配置多个表，每个表有自己的 topic）
+# 如果不配置 tables，则使用 source 配置（单表模式）
+tables:
+  - table_name: "baseinfo"
+    topic: "mytopic"
+    database_name: "test"
+    database_type: "mysql"
+    enabled: true
+    # 可选：指定该表的发送间隔（毫秒），不指定则使用全局 send.interval_ms
+    # interval_ms: 2000
+  # 可以添加更多表...
+  # - table_name: "orderinfo"
+  #   topic: "order-topic"
+  #   database_name: "test"
+  #   database_type: "mysql"
+  #   enabled: true
+
+# 单表模式时的源表配置（当 tables 为空时使用）
 source:
   # 源表名
   table_name: "baseinfo"

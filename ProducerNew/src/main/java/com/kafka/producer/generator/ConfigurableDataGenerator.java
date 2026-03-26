@@ -29,6 +29,9 @@ public class ConfigurableDataGenerator {
     private final Random random = new Random();
     private final DateTimeFormatter DATETIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
+    // 当前表名（支持多表）
+    private final String currentTableName;
+
     // 序列生成器
     private final Map<String, AtomicLong> sequences = new ConcurrentHashMap<>();
 
@@ -44,8 +47,13 @@ public class ConfigurableDataGenerator {
     private static final String[] PHONE_PREFIXES = {"138", "139", "137", "136", "135", "188", "187", "182", "183"};
 
     public ConfigurableDataGenerator(ProducerTableConfigLoader tableConfig, ProducerAppConfigLoader appConfig) {
+        this(tableConfig, appConfig, null);
+    }
+
+    public ConfigurableDataGenerator(ProducerTableConfigLoader tableConfig, ProducerAppConfigLoader appConfig, String tableName) {
         this.tableConfig = tableConfig;
         this.appConfig = appConfig;
+        this.currentTableName = tableName != null ? tableName : appConfig.getSource().getTableName();
 
         // 初始化序列
         if (tableConfig.getTables() != null) {
@@ -60,18 +68,17 @@ public class ConfigurableDataGenerator {
             }
         }
 
-        log.info("ConfigurableDataGenerator 初始化完成");
+        log.info("ConfigurableDataGenerator 初始化完成，当前表：{}", currentTableName);
     }
 
     /**
      * 生成一条 CDC 记录
      */
     public Map<String, Object> generateRecord(String opcode, Map<String, Object> existingData) {
-        String tableName = appConfig.getSource().getTableName();
-        ProducerTableConfigLoader.TableConfig table = tableConfig.getTableByName(tableName);
+        ProducerTableConfigLoader.TableConfig table = tableConfig.getTableByName(currentTableName);
 
         if (table == null) {
-            throw new RuntimeException("表配置不存在：" + tableName);
+            throw new RuntimeException("表配置不存在：" + currentTableName);
         }
 
         Map<String, Object> record = new HashMap<>();
