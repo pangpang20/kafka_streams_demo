@@ -2,122 +2,7 @@
 
 基于配置文件实现的通用 Kafka Streams 数据质量检查系统，支持动态规则刷新和多表自动识别。
 
-## 特性
-
-- **完全可配置**：所有配置通过 YAML 文件管理，无需修改代码
-- **动态规则刷新**：验证规则修改后自动生效，无需重启应用（5 秒内检测）
-- **多表自动识别**：支持同一个 Topic 中多个表的数据，自动识别并路由
-- **目录式配置加载**：支持从目录自动加载所有表的配置和规则
-- **灵活输出**：可选择是否写入 Kafka Topic 和 OceanBase 数据库
-- **自动建表**：支持自动在 OceanBase 中创建目标表
-
-## 配置文件说明
-
-### 1. connection-config.yaml - 连接配置
-
-```yaml
-kafka:
-  bootstrap_servers: "localhost:19091,localhost:19092,localhost:19093"
-  security:
-    enabled: true
-    protocol: "SASL_PLAINTEXT"
-    mechanism: "PLAIN"
-    username: "admin"
-    password: "Audaque@123"
-
-oceanbase:
-  host: "localhost"
-  port: 2881
-  username: "root@test"
-  password: "Audaque@123"
-  database: "kafka_quality_check"
-```
-
-### 2. app-config.yaml - 应用配置
-
-```yaml
-app:
-  name: "configurable-consumer-app"
-  state_dir: "/tmp/kafka-streams-consumer"
-  auto_offset_reset: "earliest"
-
-source:
-  topic: "mytopic"             # 源 Topic（包含多个表的数据）
-  auto_create_table: true      # 是否自动建表
-  write_to_topic: true         # 是否写入 Topic
-  valid_data_topic: "mytopic-valid"
-  invalid_data_topic: "mytopic-invalid"
-  write_to_oceanbase: true     # 是否写入 OceanBase
-  invalid_table_prefix: "e_"   # 异议数据表前缀
-```
-
-### 3. 表结构配置（支持目录加载）
-
-**方式一：单文件模式**
-```bash
-src/main/resources/table-schema.yaml
-```
-
-**方式二：目录模式（推荐）**
-```bash
-src/main/resources/schemas/
-├── baseinfo.yaml      # baseinfo 表结构
-├── orderinfo.yaml     # orderinfo 表结构
-└── ...                # 更多表配置
-```
-
-每个表配置文件示例：
-```yaml
-tables:
-  - name: "baseinfo"
-    description: "人员基本信息表"
-    fields:
-      - name: "personid"
-        type: "BIGINT"
-        nullable: true
-      - name: "idcard"
-        type: "STRING"
-        nullable: false
-        isPrimaryKey: true
-      - name: "name"
-        type: "STRING"
-        nullable: true
-```
-
-### 4. 验证规则配置（支持目录加载 + 动态刷新）
-
-**方式一：单文件模式**
-```bash
-src/main/resources/validation-rules.yaml
-```
-
-**方式二：目录模式（推荐）**
-```bash
-src/main/resources/rules/
-├── baseinfo-rules.yaml    # baseinfo 表规则
-├── orderinfo-rules.yaml   # orderinfo 表规则
-└── ...                    # 更多表规则
-```
-
-每个规则文件示例：
-```yaml
-tables:
-  - name: "baseinfo"
-    rules:
-      - field: "sex"
-        type: "enum"
-        enabled: true
-        values: ["男", "女"]
-      - field: "age"
-        type: "range"
-        enabled: true
-        min_value: 0
-        max_value: 120
-      - field: "telephone"
-        type: "regex"
-        enabled: true
-        pattern: "^1[3-9]\\d{9}$"
-```
+**一个 Topic 对应一个表**，通过命令行参数指定 Topic 和配置文件。
 
 ## 快速开始
 
@@ -128,21 +13,64 @@ cd /opt/kafka_streams_demo/ConsumerNew
 mvn clean package
 ```
 
-### 启动
+### 启动方式
+
+#### 方式 1：指定配置目录（推荐）
 
 ```bash
-# 使用默认配置路径 (src/main/resources)
-# 自动检测 schemas/ 和 rules/ 目录，如果不存在则使用单文件
-./start.sh
+# 使用默认资源目录中的配置
+./start.sh --topic mytopic --config-dir src/main/resources
 
-# 使用自定义配置路径
-./start.sh /path/to/config
+# 或者使用外部配置目录
+./start.sh --topic mytopic --config-dir /path/to/config
+```
+
+配置目录结构：
+```
+config/
+├── schemas/              # 表结构配置目录（自动加载所有 YAML 文件）
+│   └── baseinfo.yaml
+└── rules/                # 验证规则配置目录（自动加载所有 YAML 文件）
+    └── baseinfo-rules.yaml
+```
+
+#### 方式 2：分别指定 schema 和 rules 文件
+
+```bash
+./start.sh --schema /path/to/baseinfo.yaml --rules /path/to/baseinfo-rules.yaml
+```
+
+#### 方式 3：使用默认配置
+
+```bash
+./start.sh
+```
+
+### 命令行参数
+
+| 参数 | 简写 | 说明 |
+|------|------|------|
+| `--topic <name>` | `-t` | 指定 Kafka Topic（一个 topic 对应一个表） |
+| `--config-dir <path>` | `-c` | 指定配置目录，自动加载 `schemas/` 和 `rules/` |
+| `--schema <file>` | `-s` | 指定表结构配置文件 |
+| `--rules <file>` | `-r` | 指定验证规则配置文件 |
+| `--help` | `-h` | 显示帮助信息 |
+
+### 使用示例
+
+```bash
+# 启动 baseinfo 表的消费者
+./start.sh --topic mytopic-baseinfo --config-dir config/baseinfo
+
+# 启动 orderinfo 表的消费者
+./start.sh --topic mytopic-orderinfo --config-dir config/orderinfo
 ```
 
 ### 停止
 
 ```bash
 ./stop.sh
+# 或 Ctrl+C
 ```
 
 ## 多表自动识别

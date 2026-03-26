@@ -1,13 +1,19 @@
 #!/bin/bash
 
 # ConsumerNew 启动脚本
-# 使用说明：./start.sh [配置文件路径]
+# 使用说明：./start.sh [选项]
+#
+# 选项:
+#   --topic <topic_name>     指定 Kafka Topic
+#   --config-dir <dir_path>  指定配置目录
+#   --help                   显示帮助信息
+#
+# 示例:
+#   ./start.sh --topic mytopic --config-dir /path/to/config
+#   ./start.sh -t mytopic -c /path/to/config
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
-
-# 配置文件路径（可选参数）
-CONFIG_PATH="${1:-src/main/resources}"
 
 # 检查是否已编译
 if [ ! -f "target/kafka-streams-consumer-new-1.0.0-jar-with-dependencies.jar" ]; then
@@ -24,9 +30,8 @@ mkdir -p logs
 
 # 启动应用
 echo "启动 ConsumerNew..."
-echo "配置文件路径：$CONFIG_PATH"
 
 java -Xms512m -Xmx2g \
      -jar target/kafka-streams-consumer-new-1.0.0-jar-with-dependencies.jar \
-     "$CONFIG_PATH" \
+     "$@" \
      2>&1 | tee logs/app-$(date +%Y%m%d-%H%M%S).log
