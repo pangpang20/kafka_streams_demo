@@ -41,7 +41,7 @@ echo "  等待 OceanBase 数据库就绪..."
 MAX_RETRIES=30
 RETRY_COUNT=0
 while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-    if docker exec oceanbase obclient -h 127.0.0.1 -P 2881 -u root@test -e "SELECT 1" > /dev/null 2>&1; then
+    if docker exec oceanbase obclient -h 127.0.0.1 -P 2881 -u root@test -p'Audaque@123' -e "SELECT 1" > /dev/null 2>&1; then
         echo "  ✓ OceanBase 数据库已就绪"
         break
     fi
@@ -60,7 +60,7 @@ docker exec oceanbase obclient -h 127.0.0.1 -P 2881 -u root@test -e "ALTER USER 
 
 # 初始化数据库和表 (每次启动自动执行)
 echo "  初始化 OceanBase 数据库表..."
-docker exec -i oceanbase obclient -h 127.0.0.1 -P 2881 -u root@test -p'Audaque@123' < /opt/kafka_streams_demo/docker/init-ob.sql 2>/dev/null || true
+docker exec -i oceanbase obclient -h 127.0.0.1 -P 2881 -u root@test < /opt/kafka_streams_demo/docker/init-ob.sql 2>/dev/null || true
 
 echo
 echo "======================================"
