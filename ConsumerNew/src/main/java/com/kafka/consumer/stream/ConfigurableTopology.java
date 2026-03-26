@@ -3,7 +3,7 @@ package com.kafka.consumer.stream;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kafka.consumer.config.*;
 import com.kafka.consumer.model.ProcessingResult;
-import com.kafka.consumer.processor.ConfigurableDataProcessor;
+import com.kafka.consumer.processor.MultiTableDataProcessor;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.StreamsBuilder;
@@ -27,10 +27,9 @@ public class ConfigurableTopology {
     private static final Logger log = LoggerFactory.getLogger(ConfigurableTopology.class);
 
     private final AppConfigLoader appConfig;
-    private final ConfigurableDataProcessor processor;
+    private final MultiTableDataProcessor processor;
     private final ObjectMapper objectMapper;
-    private final ConfigurableInvalidDataWriter invalidDataWriter;
-    private final ConfigurableValidDataWriter validDataWriter;
+    private final MultiTableDataWriter dataWriter;
 
     private KafkaStreams streams;
 
@@ -42,24 +41,29 @@ public class ConfigurableTopology {
                                  ConnectionConfigLoader connectionConfig,
                                  TableSchemaConfigLoader schemaConfig) {
         this.appConfig = appConfig;
-        this.processor = new ConfigurableDataProcessor(appConfig.getSourceTableName(), ruleConfig);
+        this.processor = new MultiTableDataProcessor(ruleConfig);
 
-        // 根据配置决定是否初始化写入器
+        // 初始化多表写入器
         if (appConfig.isWriteToOceanbase()) {
-            this.validDataWriter = new ConfigurableValidDataWriter(connectionConfig, schemaConfig, appConfig);
-            this.invalidDataWriter = new ConfigurableInvalidDataWriter(connectionConfig, schemaConfig, appConfig);
+            this.dataWriter = new MultiTableDataWriter(connectionConfig, schemaConfig, appConfig);
         } else {
-            this.validDataWriter = null;
-            this.invalidDataWriter = null;
+            this.dataWriter = null;
         }
 
         this.objectMapper = new ObjectMapper();
 
-        log.info("ConfigurableTopology 初始化完成");
-        log.info("  源表名：{}", appConfig.getSourceTableName());
+        // 注册已知表
+        if (schemaConfig.getTables() != null) {
+            for (TableSchemaConfigLoader.TableConfig table : schemaConfig.getTables()) {
+                processor.registerTables(java.util.Collections.singletonList(table.getName()));
+            }
+        }
+
+        log.info("ConfigurableTopology 初始化完成（多表模式）");
         log.info("  源 Topic: {}", appConfig.getSourceTopic());
         log.info("  写入 Topic: {}", appConfig.isWriteToTopic());
         log.info("  写入 OceanBase: {}", appConfig.isWriteToOceanbase());
+        log.info("  已知表数量：{}", processor.getKnownTables().size());
     }
 
     /**
@@ -91,28 +95,28 @@ public class ConfigurableTopology {
             }
         });
 
-        log.info("已定义处理流：ConfigurableDataProcessor");
+        log.info("已定义处理流：MultiTableDataProcessor（多表模式）");
 
         // 日志记录和数据库写入
         processedStream.peek((key, result) -> {
             if (result == null) {
-                // 表名不匹配，跳过
                 return;
             }
+            String tableName = result.getTableName() != null ? result.getTableName() : "unknown";
             if (result.isSuccess()) {
                 log.info("[PASS] key={}, opcode={}, table={}",
                         key,
-                        result.getRecord() != null ? result.getRecord().getOpcode() : "N/A",
-                        result.getRecord() != null ? result.getRecord().getTablename() : "N/A");
+                        result.getOpcode(),
+                        tableName);
                 // 写入正常数据到 OceanBase
-                if (validDataWriter != null) {
-                    validDataWriter.logValidData(result);
+                if (dataWriter != null) {
+                    dataWriter.logValidData(result);
                 }
             } else {
-                log.warn("[FAIL] key={}, reason={}", key, result.getMessage());
+                log.warn("[FAIL] key={}, table={}, reason={}", key, tableName, result.getMessage());
                 // 写入异议数据到 OceanBase
-                if (invalidDataWriter != null) {
-                    invalidDataWriter.logInvalidData(result);
+                if (dataWriter != null) {
+                    dataWriter.logInvalidData(result);
                 }
             }
         });
@@ -152,10 +156,11 @@ public class ConfigurableTopology {
         log.info("Kafka Streams 拓扑构建完成");
         log.info("-------------------------------------");
         log.info("拓扑流程:");
-        log.info("  {} -> [ConfigurableDataProcessor] -> {} / {}",
+        log.info("  {} -> [MultiTableDataProcessor] -> {} / {}",
                 appConfig.getSourceTopic(),
                 appConfig.isWriteToTopic() ? appConfig.getSource().getValidDataTopic() : "(不写入 Topic)",
                 appConfig.isWriteToTopic() ? appConfig.getSource().getInvalidDataTopic() : "(不写入 Topic)");
+        log.info("已知表：{}", String.join(", ", processor.getKnownTables()));
         log.info("-------------------------------------");
 
         return builder;
@@ -185,11 +190,8 @@ public class ConfigurableTopology {
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             log.info("收到关闭信号，正在停止 Streams 应用...");
             streams.close();
-            if (validDataWriter != null) {
-                validDataWriter.close();
-            }
-            if (invalidDataWriter != null) {
-                invalidDataWriter.close();
+            if (dataWriter != null) {
+                dataWriter.close();
             }
             log.info("Streams 应用已停止");
         }));

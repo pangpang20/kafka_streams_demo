@@ -12,6 +12,7 @@ import java.util.Map;
 import java.util.HashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
+import java.util.ArrayList;
 
 /**
  * 验证规则配置加载器（支持动态刷新）
@@ -25,9 +26,10 @@ public class ValidationRuleConfigLoader {
 
     private static final Logger log = LoggerFactory.getLogger(ValidationRuleConfigLoader.class);
     private static final String DEFAULT_CONFIG_PATH = "src/main/resources/validation-rules.yaml";
+    private static final String DEFAULT_CONFIG_DIR = "src/main/resources/rules";
 
     private volatile List<TableRuleConfig> tables;
-    private final String configPath;
+    private String configPath;
     private final ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
 
     // 规则缓存（按表名缓存）
@@ -96,18 +98,19 @@ public class ValidationRuleConfigLoader {
     }
 
     /**
-     * 加载配置文件
+     * 加载配置文件（支持单文件或目录）
      */
     public synchronized void loadConfig(String configPath) {
         try {
             File configFile = new File(configPath);
 
             if (!configFile.exists()) {
-                log.warn("配置文件不存在：{}, 尝试从 classpath 加载", configPath);
+                log.warn("配置文件/目录不存在：{}, 尝试从 classpath 加载", configPath);
                 var is = getClass().getClassLoader().getResourceAsStream("validation-rules.yaml");
                 if (is != null) {
                     ValidationRuleConfigLoader loaded = mapper.readValue(is, ValidationRuleConfigLoader.class);
                     updateRules(loaded.tables);
+                    this.configFile = new File(configPath);
                     this.lastModified = System.currentTimeMillis();
                     return;
                 } else {
@@ -115,16 +118,68 @@ public class ValidationRuleConfigLoader {
                 }
             }
 
-            ValidationRuleConfigLoader loaded = mapper.readValue(configFile, ValidationRuleConfigLoader.class);
-            updateRules(loaded.tables);
             this.configFile = configFile;
-            this.lastModified = configFile.lastModified();
 
+            if (configFile.isDirectory()) {
+                // 从目录加载所有 YAML 文件
+                loadFromDirectory(configFile);
+            } else {
+                // 从单文件加载
+                ValidationRuleConfigLoader loaded = mapper.readValue(configFile, ValidationRuleConfigLoader.class);
+                updateRules(loaded.tables);
+                this.lastModified = configFile.lastModified();
+            }
+
+            this.configPath = configPath;
             log.info("验证规则配置加载成功：{}", configPath);
         } catch (Exception e) {
             log.error("加载验证规则配置失败：{}", e.getMessage(), e);
             throw new RuntimeException("加载验证规则配置失败", e);
         }
+    }
+
+    /**
+     * 从目录加载所有 YAML 配置文件
+     */
+    private void loadFromDirectory(File dir) throws Exception {
+        List<TableRuleConfig> allTables = new ArrayList<>();
+        File[] yamlFiles = dir.listFiles((d, name) -> name.endsWith(".yaml") || name.endsWith(".yml"));
+
+        if (yamlFiles == null || yamlFiles.length == 0) {
+            log.warn("目录 {} 中没有找到 YAML 配置文件", dir.getAbsolutePath());
+            updateRules(null);
+            return;
+        }
+
+        for (File yamlFile : yamlFiles) {
+            try {
+                log.info("加载规则配置文件：{}", yamlFile.getName());
+                ValidationRuleConfigLoader loaded = mapper.readValue(yamlFile, ValidationRuleConfigLoader.class);
+                if (loaded.tables != null) {
+                    allTables.addAll(loaded.tables);
+                }
+            } catch (Exception e) {
+                log.error("加载规则配置文件 {} 失败：{}", yamlFile.getName(), e.getMessage());
+            }
+        }
+
+        updateRules(allTables);
+        this.lastModified = getLastModifiedInDirectory(dir);
+        log.info("从目录加载规则完成：{} 个表配置", allTables.size());
+    }
+
+    /**
+     * 获取目录中最新的文件修改时间
+     */
+    private long getLastModifiedInDirectory(File dir) {
+        File[] yamlFiles = dir.listFiles((d, name) -> name.endsWith(".yaml") || name.endsWith(".yml"));
+        long max = 0;
+        if (yamlFiles != null) {
+            for (File f : yamlFiles) {
+                max = Math.max(max, f.lastModified());
+            }
+        }
+        return max;
     }
 
     /**
@@ -169,7 +224,10 @@ public class ValidationRuleConfigLoader {
             return;
         }
 
-        long currentModified = configFile.lastModified();
+        long currentModified = configFile.isDirectory()
+            ? getLastModifiedInDirectory(configFile)
+            : configFile.lastModified();
+
         if (currentModified > lastModified) {
             log.info("检测到配置文件变化，重新加载规则...");
             loadConfig(configPath);
@@ -202,7 +260,10 @@ public class ValidationRuleConfigLoader {
                         continue;
                     }
 
-                    long currentModified = fileToWatch.lastModified();
+                    long currentModified = fileToWatch.isDirectory()
+                        ? getLastModifiedInDirectory(fileToWatch)
+                        : fileToWatch.lastModified();
+
                     if (currentModified > lastModified) {
                         log.info("检测到配置文件变化，重新加载规则...");
                         loadConfig(configPath);

@@ -68,8 +68,23 @@ public class ConfigurableConsumer {
             System.out.println("正在加载配置文件...");
             ConnectionConfigLoader connectionConfig = new ConnectionConfigLoader(configPath + "/connection-config.yaml");
             AppConfigLoader appConfig = new AppConfigLoader(configPath + "/app-config.yaml");
-            TableSchemaConfigLoader schemaConfig = new TableSchemaConfigLoader(configPath + "/table-schema.yaml");
-            ValidationRuleConfigLoader ruleConfig = new ValidationRuleConfigLoader(configPath + "/validation-rules.yaml");
+
+            // 支持目录加载：优先从 schemas/rules 目录加载，否则使用单文件
+            String schemaConfigPath = configPath + "/schemas";
+            if (!new File(schemaConfigPath).exists()) {
+                schemaConfigPath = configPath + "/table-schema.yaml";
+            }
+            TableSchemaConfigLoader schemaConfig = new TableSchemaConfigLoader(schemaConfigPath);
+
+            String ruleConfigPath = configPath + "/rules";
+            if (!new File(ruleConfigPath).exists()) {
+                ruleConfigPath = configPath + "/validation-rules.yaml";
+            }
+            ValidationRuleConfigLoader ruleConfig = new ValidationRuleConfigLoader(ruleConfigPath);
+
+            // 启动文件监听（动态刷新）
+            schemaConfig.startWatching();
+            ruleConfig.startWatching();
 
             // 打印配置信息
             connectionConfig.printConfig();
