@@ -1,4 +1,0 @@
-/opt/kafka_streams_demo/Producer/src/main/java/com/kafka/producer/config/ProducerConfig.java
-/opt/kafka_streams_demo/Producer/src/main/java/com/kafka/producer/model/CdcEvent.java
-/opt/kafka_streams_demo/Producer/src/main/java/com/kafka/producer/generator/RandomDataGenerator.java
-/opt/kafka_streams_demo/Producer/src/main/java/com/kafka/producer/CdcDataProducer.java
