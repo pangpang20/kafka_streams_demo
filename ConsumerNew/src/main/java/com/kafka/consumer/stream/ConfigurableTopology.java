@@ -16,6 +16,7 @@ import java.time.Instant;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * 可配置 Kafka Streams 拓扑构建器
@@ -53,23 +54,24 @@ public class ConfigurableTopology {
     }
 
     /**
-     * 任务运行时状态
+     * 任务运行时状态（线程安全）
      */
     public static class TaskStatus {
         private final String taskId;
-        private TaskState state;
+        private final AtomicReference<TaskState> state;
         private final long startTime;
-        private long endTime;
-        private String errorMessage;
+        private final AtomicLong endTime;
+        private final AtomicReference<String> errorMessage;
         private final AtomicLong processedCount;
         private final AtomicLong validCount;
         private final AtomicLong invalidCount;
 
         public TaskStatus(String taskId) {
             this.taskId = taskId;
-            this.state = TaskState.INIT;
+            this.state = new AtomicReference<>(TaskState.INIT);
             this.startTime = System.currentTimeMillis();
-            this.endTime = 0;
+            this.endTime = new AtomicLong(0);
+            this.errorMessage = new AtomicReference<>(null);
             this.processedCount = new AtomicLong(0);
             this.validCount = new AtomicLong(0);
             this.invalidCount = new AtomicLong(0);
@@ -80,11 +82,11 @@ public class ConfigurableTopology {
         }
 
         public TaskState getState() {
-            return state;
+            return state.get();
         }
 
         public void setState(TaskState state) {
-            this.state = state;
+            this.state.set(state);
         }
 
         public long getStartTime() {
@@ -92,19 +94,19 @@ public class ConfigurableTopology {
         }
 
         public long getEndTime() {
-            return endTime;
+            return endTime.get();
         }
 
         public void setEndTime(long endTime) {
-            this.endTime = endTime;
+            this.endTime.set(endTime);
         }
 
         public String getErrorMessage() {
-            return errorMessage;
+            return errorMessage.get();
         }
 
         public void setErrorMessage(String errorMessage) {
-            this.errorMessage = errorMessage;
+            this.errorMessage.set(errorMessage);
         }
 
         public long getProcessedCount() {
@@ -132,8 +134,9 @@ public class ConfigurableTopology {
         }
 
         public long getRunningTime() {
-            if (endTime > 0) {
-                return endTime - startTime;
+            long end = endTime.get();
+            if (end > 0) {
+                return end - startTime;
             }
             return System.currentTimeMillis() - startTime;
         }
