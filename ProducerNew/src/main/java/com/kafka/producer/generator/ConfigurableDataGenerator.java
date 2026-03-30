@@ -44,7 +44,38 @@ public class ConfigurableDataGenerator {
     private static final String[] ADDRESSES = {"北京", "上海", "广东", "江苏", "浙江", "山东", "河南", "河北", "湖北", "湖南"};
     private static final String[] BLOOD_TYPES = {"A", "B", "O", "AB"};
     private static final String[] ID_PREFIXES = {"110", "310", "440", "320", "330", "370", "410", "130"};
-    private static final String[] PHONE_PREFIXES = {"138", "139", "137", "136", "135", "188", "187", "182", "183"};
+
+    // 中国手机号段前缀（按运营商分类）
+    // 中国移动：134, 135, 136, 137, 138, 139, 147, 148, 150, 151, 152, 157, 158, 159, 172, 178, 182, 183, 184, 187, 188, 198
+    // 中国联通：130, 131, 132, 145, 146, 155, 156, 166, 171, 175, 176, 185, 186, 196
+    // 中国电信：133, 149, 153, 173, 174, 177, 180, 181, 189, 191, 199
+    // 中国广电：192
+    private static final String[] PHONE_PREFIXES = {
+        // 中国移动
+        "134", "135", "136", "137", "138", "139",
+        "147", "148",
+        "150", "151", "152", "157", "158", "159",
+        "172", "178",
+        "182", "183", "184", "187", "188",
+        "198",
+        // 中国联通
+        "130", "131", "132",
+        "145", "146",
+        "155", "156",
+        "166",
+        "171", "175", "176",
+        "185", "186",
+        "196",
+        // 中国电信
+        "133",
+        "149",
+        "153",
+        "173", "174", "177",
+        "180", "181", "189",
+        "191", "199",
+        // 中国广电
+        "192"
+    };
 
     public ConfigurableDataGenerator(ProducerTableConfigLoader tableConfig, ProducerAppConfigLoader appConfig) {
         this(tableConfig, appConfig, null);
