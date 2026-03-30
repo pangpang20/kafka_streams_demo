@@ -51,14 +51,16 @@ tables:
     database_name: "test"
     database_type: "mysql"
     enabled: true
-    # 可选：指定该表的发送间隔（毫秒），不指定则使用全局 send.interval_ms
-    # interval_ms: 2000
+    # 指定该表的发送间隔（毫秒）
+    interval_ms: 1000
   # 可以添加更多表...
   - table_name: "orderinfo"
     topic: "orderinfo-topic"
     database_name: "test"
     database_type: "mysql"
     enabled: true
+    # 指定该表的发送间隔（毫秒）
+    interval_ms: 1000
 
 # 单表模式时的源表配置（当 tables 为空时使用）
 source:
