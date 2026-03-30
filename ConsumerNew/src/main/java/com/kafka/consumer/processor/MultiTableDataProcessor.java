@@ -68,19 +68,22 @@ public class MultiTableDataProcessor {
      * @return 处理结果
      */
     public ProcessingResult process(String key, String value) {
+        CdcEvent.DataRecord record = null;  // 在 try 外面声明
         try {
             // 1. 解析 CDC 数据
             CdcEvent event = parseCdcEvent(value);
             if (event == null || event.getData() == null || event.getData().length == 0) {
+                log.error("[处理失败] CDC 数据解析失败，key={}", key);
                 return createFailureResult("CDC 数据解析失败", null, key, value,
                         "JSON 解析失败", "structure", null);
             }
 
             // 2. 获取第一条记录处理
-            CdcEvent.DataRecord record = event.getData()[0];
+            record = event.getData()[0];
 
             // 3. 认证检查
             if (!authenticate(record)) {
+                log.warn("[处理失败] 认证失败，key={}, table={}", key, record.getTablename());
                 return createFailureResult("认证失败", record, key, value,
                         "数据源认证未通过", "auth", null);
             }
@@ -88,32 +91,35 @@ public class MultiTableDataProcessor {
             // 4. 获取表名（动态识别）
             String tableName = record.getTablename();
             if (StringUtils.isBlank(tableName)) {
+                log.error("[处理失败] 表名为空，key={}", key);
                 return createFailureResult("认证失败", record, key, value,
                         "表名为空", "auth", null);
             }
 
-            // 5. 检查是否是已知表（可选：如果希望只处理配置的表）
-            // 如果不检查，可以自动处理任何表（只要有规则配置）
+            log.info("[处理开始] 表={}, key={}, opcode={}", tableName, key, record.getOpcode());
+
+            // 5. 检查是否是已知表
             if (!knownTables.containsKey(tableName)) {
-                // 新表自动注册（按需处理）
-                log.info("检测到新表：{}, 自动注册并创建验证器", tableName);
+                log.info("[新表检测] 检测到新表：{}, 自动注册并创建验证器", tableName);
                 knownTables.put(tableName, true);
             }
 
             // 6. 结构检查
             if (record.getAllfields() == null || record.getAllfields().getAfterData() == null) {
+                log.error("[处理失败] 数据结构异常，缺少 allfields 或 after_data，key={}, table={}", key, tableName);
                 return createFailureResult("数据结构异常", record, key, value,
                         "缺少 allfields 或 after_data", "structure", null);
             }
 
             // 7. 检查是否跳过验证（配置了 skip_validation: true 的表）
             if (ruleConfigLoader.shouldSkipValidation(tableName)) {
-                log.info("[跳过验证] 表={}, 直接通过", tableName);
+                log.info("[跳过验证] 表={}, key={}, 直接通过并入库", tableName, key);
                 return ProcessingResult.success(record, key, value);
             }
 
-            // 8. 获取表对应的验证器（动态创建或从缓存获取）
+            // 8. 获取表对应的验证器
             ConfigurableValidator validator = getValidator(tableName);
+            log.info("[开始验证] 表={}, key={}, 验证器={}", tableName, key, validator.getClass().getSimpleName());
 
             // 9. 提取字段值进行验证
             Map<String, CdcEvent.FieldData> afterData = record.getAllfields().getAfterData();
@@ -128,15 +134,17 @@ public class MultiTableDataProcessor {
                 String errorFields = extractErrorFields(errors);
                 String errorSummary = validationResult.getErrorSummary();
 
+                log.warn("[验证失败] 表={}, key={}, 错误字段={}, 详情={}", tableName, key, errorFields, errorSummary);
                 return createFailureResult("数据质量检查失败", record, key, value,
                         errorSummary, errorFields, errorSummary);
             }
 
-            // 11. 验证通过
+            log.info("[验证通过] 表={}, key={}", tableName, key);
             return ProcessingResult.success(record, key, value);
 
         } catch (Exception e) {
-            log.error("处理异常：{}", e.getMessage(), e);
+            log.error("[处理异常] table={}, key={}, 异常={}",
+                    record != null ? record.getTablename() : "unknown", key, e.getMessage(), e);
             return createFailureResult("处理异常：" + e.getMessage(), null, key, value,
                     e.getMessage(), "system", null);
         }
