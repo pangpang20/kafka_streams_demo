@@ -29,3 +29,7 @@ ProducerNew/target/
 ConsumerNew/target/
 Producer/target/
 Consumer/target/
+ProducerNew/logs/
+ConsumerNew/logs/
+Producer/logs/
+Consumer/logs/
