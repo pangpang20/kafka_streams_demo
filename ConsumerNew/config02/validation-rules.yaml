@@ -66,10 +66,39 @@ tables:
         pattern: "^[1-9]\\d{5}(18|19|20)\\d{2}(0[1-9]|1[0-2])(0[1-9]|[12]\\d|3[01])\\d{3}[\\dXx]$"
 
   # 可以添加更多表的验证规则...
-  # - name: "orders"
-  #   rules:
-  #     - field: "amount"
-  #       type: "range"
-  #       enabled: true
-  #       min_value: 0.01
-  #       max_value: 1000000.00
+  - name: "orderinfo"
+    rules:
+      # 数量验证规则
+      - field: "quantity"
+        type: "range"
+        description: "数量必须在 1-100 之间"
+        enabled: true
+        min_value: 1
+        max_value: 100
+
+      # 单价验证规则
+      - field: "price"
+        type: "range"
+        description: "单价必须非负"
+        enabled: true
+        min_value: 0.00
+
+      # 总金额验证规则
+      - field: "amount"
+        type: "range"
+        description: "总金额必须非负"
+        enabled: true
+        min_value: 0.00
+
+      # 订单状态验证规则
+      - field: "status"
+        type: "enum"
+        description: "订单状态必须是有效值"
+        enabled: true
+        values: ["pending", "paid", "shipped", "delivered", "completed"]
+
+      # 订单号验证规则
+      - field: "orderno"
+        type: "not_null"
+        description: "订单号不能为空"
+        enabled: true

@@ -24,36 +24,43 @@ cd /opt/kafka_streams_demo/ConsumerNew
 mvn clean package
 ```
 
+### 配置目录
+
+ConsumerNew 支持多套配置，通过 `config01` 和 `config02` 目录区分：
+
+```
+ConsumerNew/
+├── config01/                 # 第一套配置
+│   ├── app-config.yaml       # 应用配置
+│   ├── connection-config.yaml # 连接配置
+│   ├── table-schema.yaml     # 表结构配置
+│   ├── validation-rules.yaml # 验证规则配置
+│   ├── schemas/              # 表结构详情配置
+│   │   ├── baseinfo.yaml
+│   │   └── orderinfo.yaml
+│   └── rules/                # 验证规则详情配置
+│       ├── baseinfo-rules.yaml
+│       └── orderinfo-rules.yaml
+└── config02/                 # 第二套配置
+    └── ...                   # 同上
+```
+
 ### 启动方式
 
-#### 方式 1：指定配置目录（推荐）
+#### 方式 1：指定配置目录和任务 ID（推荐）
 
 ```bash
-# 使用默认资源目录中的配置
-./start.sh --topic mytopic --config-dir src/main/resources
+# 使用 config01 配置，自动生成任务 ID
+./start.sh --config-dir config01
 
-# 或者使用外部配置目录
-./start.sh --topic mytopic --config-dir /path/to/config
+# 使用 config02 配置，指定任务 ID
+./start.sh --config-dir config02 --task-id my-task-001
 ```
 
-配置目录结构：
-```
-config/
-├── schemas/              # 表结构配置目录（自动加载所有 YAML 文件）
-│   └── baseinfo.yaml
-└── rules/                # 验证规则配置目录（自动加载所有 YAML 文件）
-    └── baseinfo-rules.yaml
-```
-
-#### 方式 2：分别指定 schema 和 rules 文件
+#### 方式 2：使用默认配置
 
 ```bash
-./start.sh --schema /path/to/baseinfo.yaml --rules /path/to/baseinfo-rules.yaml
-```
-
-#### 方式 3：使用默认配置
-
-```bash
+# 默认使用 config01 配置
 ./start.sh
 ```
 
@@ -61,34 +68,43 @@ config/
 
 | 参数 | 简写 | 说明 | 默认值 |
 |------|------|------|--------|
-| `--topic <name>` | `-t` | 指定 Kafka Topic（一个 topic 对应一个表） | 配置文件的值 |
-| `--config-dir <path>` | `-c` | 指定配置目录，自动加载 `schemas/` 和 `rules/` | - |
-| `--schema <file>` | `-s` | 指定表结构配置文件 | - |
-| `--rules <file>` | `-r` | 指定验证规则配置文件 | - |
-| `--task-id <id>` | - | 指定任务 ID（用于跟踪任务状态） | 自动生成 UUID |
+| `--config-dir <path>` | `-c` | 指定配置目录 | config01 |
+| `--task-id <id>` | `-t` | 指定任务 ID（用于跟踪任务状态） | 自动生成 (consumer-YYYYMMDD-HHMMSS-PID) |
 | `--help` | `-h` | 显示帮助信息 | - |
 
 ### 使用示例
 
 ```bash
-# 启动 baseinfo 表的消费者
-./start.sh --topic mytopic-baseinfo --config-dir config/baseinfo
+# 启动 baseinfo 和 orderinfo 表的消费者（使用 config01 配置）
+./start.sh --config-dir config01
 
-# 启动 orderinfo 表的消费者
-./start.sh --topic mytopic-orderinfo --config-dir config/orderinfo
+# 使用 config02 配置，指定任务 ID
+./start.sh --config-dir config02 --task-id order-consumer-001
 
-# 使用外部配置目录
-./start.sh -t mytopic -c /etc/kafka-consumer/config
+# 查看任务状态
+./status.sh consumer-20260330-120000-12345
 
-# 查看帮助
-./start.sh --help
+# 停止任务
+./stop.sh consumer-20260330-120000-12345
+
+# 查看所有运行中的任务
+./status.sh
+
+# 列出所有任务
+./status.sh --list
+
+# 清理已停止的任务
+./status.sh --clean
 ```
 
 ### 停止
 
 ```bash
-./stop.sh
-# 或 Ctrl+C
+# 停止指定任务
+./stop.sh <task-id>
+
+# 示例
+./stop.sh consumer-20260330-120000-12345
 ```
 
 ### 批量操作（大规模部署）

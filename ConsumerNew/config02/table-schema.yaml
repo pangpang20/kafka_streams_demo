@@ -90,12 +90,69 @@ tables:
         description: "住房面积"
         nullable: true
 
-  # 表 2: 可以添加更多表...
-  # - name: "orders"
-  #   description: "订单表"
-  #   fields:
-  #     - name: "orderid"
-  #       type: "BIGINT"
-  #       description: "订单 ID"
-  #       is_primary_key: true
-  #     ...
+  # 表 2: orderinfo 订单信息表
+  - name: "orderinfo"
+    description: "订单信息表"
+
+    # 字段定义
+    fields:
+      - name: "orderid"
+        type: "BIGINT"
+        description: "订单 ID"
+        nullable: false
+        is_primary_key: true
+
+      - name: "userid"
+        type: "STRING"
+        description: "用户 ID"
+        nullable: true
+
+      - name: "orderno"
+        type: "STRING"
+        description: "订单号"
+        nullable: true
+
+      - name: "productname"
+        type: "STRING"
+        description: "产品名称"
+        nullable: true
+
+      - name: "quantity"
+        type: "INT"
+        description: "数量"
+        nullable: true
+
+      - name: "price"
+        type: "DECIMAL"
+        description: "单价"
+        nullable: true
+
+      - name: "amount"
+        type: "DECIMAL"
+        description: "总金额"
+        nullable: true
+
+      - name: "orderdate"
+        type: "TIMESTAMP"
+        description: "订单日期"
+        nullable: true
+
+      - name: "shippingaddress"
+        type: "STRING"
+        description: "收货地址"
+        nullable: true
+
+      - name: "status"
+        type: "STRING"
+        description: "订单状态"
+        nullable: true
+
+      - name: "createdtime"
+        type: "TIMESTAMP"
+        description: "创建时间"
+        nullable: true
+
+      - name: "updatetime"
+        type: "TIMESTAMP"
+        description: "更新时间"
+        nullable: true

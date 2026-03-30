@@ -11,6 +11,7 @@
 - **问题数据注入**：可配置概率生成问题数据用于测试
 - **操作类型**：支持插入、更新、删除操作，概率可配
 - **每表独立配置**：每个表可以有自己的发送间隔
+- **正常/异常数据分离**：每个表可配置正常数据 topic 和异常数据 topic
 
 ## 快速开始
 
@@ -27,11 +28,11 @@ mvn clean package
 # 使用默认配置路径
 ./start.sh
 
-# 指定配置文件路径
-./start.sh /path/to/config
+# 指定配置文件路径（config 目录）
+./start.sh config
 
 # 运行指定时长后自动停止（秒）
-./start.sh 60
+./start.sh config 60
 ```
 
 ### 停止
@@ -43,7 +44,7 @@ kill <pid>
 
 ## 配置文件说明
 
-ProducerNew 有三个配置文件，都在 `src/main/resources/` 目录下：
+ProducerNew 有三个配置文件，都在 `config/` 目录下：
 
 ### 1. connection-config.yaml - 连接配置
 
@@ -100,9 +101,15 @@ topic:
 
 # 多表配置（推荐方式）
 # 配置后，每个表的数据会发送到不同的 Topic
+# 每个表可以配置三个 Topic：
+# - topic: 主 Topic（原始数据，包含正常和异常数据）
+# - valid_data_topic: 正常数据 Topic（可选）
+# - invalid_data_topic: 异常数据 Topic（可选）
 tables:
   - table_name: "baseinfo"
-    topic: "mytopic"
+    topic: "baseinfo-topic"
+    valid_data_topic: "baseinfo-valid"
+    invalid_data_topic: "baseinfo-invalid"
     database_name: "test"
     database_type: "mysql"
     enabled: true
@@ -110,7 +117,9 @@ tables:
     # interval_ms: 2000
 
   - table_name: "orderinfo"
-    topic: "order-topic"
+    topic: "orderinfo-topic"
+    valid_data_topic: "orderinfo-valid"
+    invalid_data_topic: "orderinfo-invalid"
     database_name: "test"
     database_type: "mysql"
     enabled: true
@@ -130,6 +139,7 @@ source:
 
 ```yaml
 tables:
+  # 表 1: baseinfo 人员基本信息表
   - name: "baseinfo"
     description: "人员基本信息表"
     primary_key: "idcard"
@@ -145,7 +155,7 @@ tables:
       - name: "name"
         type: "STRING"
         generator: "name"
-        values:
+        values_map:
           surnames: ["张", "王", "李"]
           names: ["伟", "芳", "娜"]
       - name: "sex"
@@ -154,6 +164,24 @@ tables:
         values: ["男", "女"]
         bad_values: ["M", "F", "未知"]
         bad_probability: 10
+
+  # 表 2: orderinfo 订单信息表
+  - name: "orderinfo"
+    description: "订单信息表"
+    primary_key: "orderid"
+    key_fields: "orderid"
+    fields:
+      - name: "orderid"
+        type: "BIGINT"
+        generator: "sequence"
+        sequence_name: "orderid_seq"
+      - name: "userid"
+        type: "STRING"
+        generator: "uuid"
+      - name: "productname"
+        type: "STRING"
+        generator: "random_select"
+        values: ["iPhone 15", "MacBook Pro", "iPad Air"]
 ```
 
 ## 多表多 Topic 配置示例
@@ -174,61 +202,34 @@ topic:
   replication_factor: 3
 
 tables:
-  # 表 1: baseinfo -> mytopic
+  # 表 1: baseinfo
   - table_name: "baseinfo"
-    topic: "mytopic"
+    topic: "baseinfo-topic"           # 主 Topic（原始数据）
+    valid_data_topic: "baseinfo-valid"     # 正常数据 Topic
+    invalid_data_topic: "baseinfo-invalid" # 异常数据 Topic
     database_name: "test"
     database_type: "mysql"
     enabled: true
     interval_ms: 1000  # 每秒 1 条
 
-  # 表 2: orderinfo -> order-topic
+  # 表 2: orderinfo
   - table_name: "orderinfo"
-    topic: "order-topic"
+    topic: "orderinfo-topic"
+    valid_data_topic: "orderinfo-valid"
+    invalid_data_topic: "orderinfo-invalid"
     database_name: "test"
     database_type: "mysql"
     enabled: true
     interval_ms: 500   # 每秒 2 条
 ```
 
-**table-schema.yaml**:
+### Topic 说明
 
-```yaml
-tables:
-  # baseinfo 表结构
-  - name: "baseinfo"
-    description: "人员基本信息表"
-    primary_key: "idcard"
-    key_fields: "idcard"
-    fields:
-      - name: "idcard"
-        type: "STRING"
-        generator: "idcard"
-      - name: "name"
-        type: "STRING"
-        generator: "name"
-      # ... 更多字段
-
-  # orderinfo 表结构
-  - name: "orderinfo"
-    description: "订单信息表"
-    primary_key: "orderid"
-    key_fields: "orderid"
-    fields:
-      - name: "orderid"
-        type: "BIGINT"
-        generator: "sequence"
-        sequence_name: "orderid_seq"
-      - name: "userid"
-        type: "STRING"
-        generator: "idcard"
-      - name: "amount"
-        type: "DOUBLE"
-        generator: "random_double"
-        min: 10.0
-        max: 10000.0
-      # ... 更多字段
-```
+| Topic 类型 | 说明 | 数据内容 |
+|------------|------|----------|
+| `{table}-topic` | 主 Topic | 包含所有原始数据（正常 + 异常） |
+| `{table}-valid` | 正常数据 Topic | 仅包含验证通过的正常数据 |
+| `{table}-invalid` | 异常数据 Topic | 仅包含验证失败的异常数据 |
 
 ### 执行流程
 
