@@ -1,9 +1,6 @@
-# 数据验证规则配置文件
-# 使用说明：为每个表的字段定义验证规则
-# 支持的规则类型：not_null, range, enum, regex, min_length, max_length
+# 数据验证规则配置文件 - config01 (baseinfo 人员基本信息表)
 
 tables:
-  # 表 1: baseinfo 人员基本信息表的验证规则
   - name: "baseinfo"
     rules:
       # 性别验证规则
@@ -49,24 +46,3 @@ tables:
         description: "住房面积必须非负"
         enabled: true
         min_value: 0.0
-
-      # 姓名验证规则 (示例：长度限制)
-      - field: "name"
-        type: "length"
-        description: "姓名长度必须在 2-20 个字符之间"
-        enabled: false
-        min_length: 2
-        max_length: 20
-
-      # 身份证号验证规则 (示例：格式验证)
-      - field: "idcard"
-        type: "regex"
-        description: "身份证号格式验证"
-        enabled: false
-        pattern: "^[1-9]\\d{5}(18|19|20)\\d{2}(0[1-9]|1[0-2])(0[1-9]|[12]\\d|3[01])\\d{3}[\\dXx]$"
-
-  # 表 2: orderinfo 订单信息表 - 跳过质检直接入库
-  - name: "orderinfo"
-    # 跳过数据质量验证，直接入库
-    skip_validation: true
-    rules: []
