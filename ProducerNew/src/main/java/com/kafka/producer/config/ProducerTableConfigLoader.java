@@ -19,7 +19,7 @@ import java.util.Map;
 public class ProducerTableConfigLoader {
 
     private static final Logger log = LoggerFactory.getLogger(ProducerTableConfigLoader.class);
-    private static final String DEFAULT_CONFIG_PATH = "src/main/resources/table-schema.yaml";
+    private static final String DEFAULT_CONFIG_PATH = "config/table-schema.yaml";
 
     private List<TableConfig> tables;
 

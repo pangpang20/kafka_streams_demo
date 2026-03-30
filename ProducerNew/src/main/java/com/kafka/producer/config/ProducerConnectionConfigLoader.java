@@ -18,7 +18,7 @@ import java.util.Properties;
 public class ProducerConnectionConfigLoader {
 
     private static final Logger log = LoggerFactory.getLogger(ProducerConnectionConfigLoader.class);
-    private static final String DEFAULT_CONFIG_PATH = "src/main/resources/connection-config.yaml";
+    private static final String DEFAULT_CONFIG_PATH = "config/connection-config.yaml";
 
     private KafkaConfig kafka;
     private ProducerConfig producer;

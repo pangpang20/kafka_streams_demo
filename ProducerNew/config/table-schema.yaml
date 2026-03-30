@@ -129,3 +129,86 @@ tables:
         # 问题数据
         bad_values: [-100.0]
         bad_probability: 10
+
+  # 表 2: orderinfo 订单信息表
+  - name: "orderinfo"
+    description: "订单信息表"
+
+    # 主键字段
+    primary_key: "orderid"
+
+    # Key 字段（用于 Kafka 消息 key）
+    key_fields: "orderid"
+
+    # 字段定义
+    fields:
+      - name: "orderid"
+        type: "BIGINT"
+        description: "订单 ID"
+        generator: "sequence"
+        sequence_name: "orderid_seq"
+
+      - name: "userid"
+        type: "STRING"
+        description: "用户 ID"
+        generator: "uuid"
+
+      - name: "orderno"
+        type: "STRING"
+        description: "订单号"
+        generator: "uuid"
+
+      - name: "productname"
+        type: "STRING"
+        description: "产品名称"
+        generator: "random_select"
+        values: ["iPhone 15", "MacBook Pro", "iPad Air", "Apple Watch", "AirPods Pro", "Magic Keyboard", "Studio Display", "Mac Studio"]
+
+      - name: "quantity"
+        type: "INT"
+        description: "数量"
+        generator: "random_int"
+        min: 1
+        max: 10
+
+      - name: "price"
+        type: "DECIMAL"
+        description: "单价"
+        generator: "random_double"
+        min: 99.00
+        max: 19999.00
+
+      - name: "amount"
+        type: "DECIMAL"
+        description: "总金额"
+        generator: "random_double"
+        min: 99.00
+        max: 199999.00
+
+      - name: "orderdate"
+        type: "TIMESTAMP"
+        description: "订单日期"
+        generator: "recent_timestamp"
+        days_back: 30
+
+      - name: "shippingaddress"
+        type: "STRING"
+        description: "收货地址"
+        generator: "random_select"
+        values: ["北京市朝阳区", "上海市浦东新区", "广州市天河区", "深圳市南山区", "杭州市西湖区", "南京市鼓楼区", "武汉市江汉区", "成都市武侯区"]
+
+      - name: "status"
+        type: "STRING"
+        description: "订单状态"
+        generator: "random_select"
+        values: ["pending", "paid", "shipped", "delivered", "completed"]
+
+      - name: "createdtime"
+        type: "TIMESTAMP"
+        description: "创建时间"
+        generator: "current_timestamp"
+
+      - name: "updatetime"
+        type: "TIMESTAMP"
+        description: "更新时间"
+        generator: "current_timestamp"

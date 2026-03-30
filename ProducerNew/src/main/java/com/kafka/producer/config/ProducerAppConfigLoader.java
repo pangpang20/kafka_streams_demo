@@ -18,7 +18,7 @@ import java.util.Map;
 public class ProducerAppConfigLoader {
 
     private static final Logger log = LoggerFactory.getLogger(ProducerAppConfigLoader.class);
-    private static final String DEFAULT_CONFIG_PATH = "src/main/resources/app-config.yaml";
+    private static final String DEFAULT_CONFIG_PATH = "config/app-config.yaml";
 
     private AppConfig app;
     private SendConfig send;
