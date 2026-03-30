@@ -1,5 +1,7 @@
 package com.kafka.consumer.config;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import org.slf4j.Logger;
@@ -22,6 +24,7 @@ import java.util.ArrayList;
  * @author Kafka Demo
  * @version 1.0.0
  */
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class ValidationRuleConfigLoader {
 
     private static final Logger log = LoggerFactory.getLogger(ValidationRuleConfigLoader.class);
@@ -63,11 +66,11 @@ public class ValidationRuleConfigLoader {
         private String description;
         private boolean enabled;
         private java.util.List<String> values;
-        private Double min_value;
-        private Double max_value;
+        private Double minValue;
+        private Double maxValue;
         private String pattern;
-        private Integer min_length;
-        private Integer max_length;
+        private Integer minLength;
+        private Integer maxLength;
 
         public String getField() { return field; }
         public void setField(String field) { this.field = field; }
@@ -79,16 +82,33 @@ public class ValidationRuleConfigLoader {
         public void setEnabled(boolean enabled) { this.enabled = enabled; }
         public java.util.List<String> getValues() { return values; }
         public void setValues(java.util.List<String> values) { this.values = values; }
-        public Double getMinValue() { return min_value; }
-        public void setMinValue(Double min_value) { this.min_value = min_value; }
-        public Double getMaxValue() { return max_value; }
-        public void setMaxValue(Double max_value) { this.max_value = max_value; }
+
+        @JsonProperty("min_value")
+        public Double getMinValue() { return minValue; }
+        public void setMinValue(Double minValue) { this.minValue = minValue; }
+
+        @JsonProperty("max_value")
+        public Double getMaxValue() { return maxValue; }
+        public void setMaxValue(Double maxValue) { this.maxValue = maxValue; }
+
         public String getPattern() { return pattern; }
         public void setPattern(String pattern) { this.pattern = pattern; }
-        public Integer getMinLength() { return min_length; }
-        public void setMinLength(Integer min_length) { this.min_length = min_length; }
-        public Integer getMaxLength() { return max_length; }
-        public void setMaxLength(Integer max_length) { this.max_length = max_length; }
+
+        @JsonProperty("min_length")
+        public Integer getMinLength() { return minLength; }
+        public void setMinLength(Integer minLength) { this.minLength = minLength; }
+
+        @JsonProperty("max_length")
+        public Integer getMaxLength() { return maxLength; }
+        public void setMaxLength(Integer maxLength) { this.maxLength = maxLength; }
+    }
+
+    // 内部类，用于 Jackson 反序列化
+    private static class InternalConfig {
+        private List<TableRuleConfig> tables;
+
+        public List<TableRuleConfig> getTables() { return tables; }
+        public void setTables(List<TableRuleConfig> tables) { this.tables = tables; }
     }
 
     public ValidationRuleConfigLoader() {
@@ -111,8 +131,8 @@ public class ValidationRuleConfigLoader {
                 log.warn("配置文件/目录不存在：{}, 尝试从 classpath 加载", configPath);
                 var is = getClass().getClassLoader().getResourceAsStream("validation-rules.yaml");
                 if (is != null) {
-                    ValidationRuleConfigLoader loaded = mapper.readValue(is, ValidationRuleConfigLoader.class);
-                    updateRules(loaded.tables);
+                    InternalConfig internal = mapper.readValue(is, InternalConfig.class);
+                    updateRules(internal.tables);
                     this.configFile = new File(configPath);
                     this.lastModified = System.currentTimeMillis();
                     return;
@@ -128,8 +148,9 @@ public class ValidationRuleConfigLoader {
                 loadFromDirectory(configFile);
             } else {
                 // 从单文件加载
-                ValidationRuleConfigLoader loaded = mapper.readValue(configFile, ValidationRuleConfigLoader.class);
-                updateRules(loaded.tables);
+                mapper.setPropertyNamingStrategy(com.fasterxml.jackson.databind.PropertyNamingStrategies.SNAKE_CASE);
+                InternalConfig internal = mapper.readValue(configFile, InternalConfig.class);
+                updateRules(internal.tables);
                 this.lastModified = configFile.lastModified();
             }
 
@@ -157,9 +178,10 @@ public class ValidationRuleConfigLoader {
         for (File yamlFile : yamlFiles) {
             try {
                 log.info("加载规则配置文件：{}", yamlFile.getName());
-                ValidationRuleConfigLoader loaded = mapper.readValue(yamlFile, ValidationRuleConfigLoader.class);
-                if (loaded.tables != null) {
-                    allTables.addAll(loaded.tables);
+                mapper.setPropertyNamingStrategy(com.fasterxml.jackson.databind.PropertyNamingStrategies.SNAKE_CASE);
+                InternalConfig internal = mapper.readValue(yamlFile, InternalConfig.class);
+                if (internal.tables != null) {
+                    allTables.addAll(internal.tables);
                 }
             } catch (Exception e) {
                 log.error("加载规则配置文件 {} 失败：{}", yamlFile.getName(), e.getMessage());

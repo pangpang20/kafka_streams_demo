@@ -1,5 +1,7 @@
 package com.kafka.consumer.config;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import org.slf4j.Logger;
@@ -20,6 +22,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * @author Kafka Demo
  * @version 1.0.0
  */
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class TableSchemaConfigLoader {
 
     private static final Logger log = LoggerFactory.getLogger(TableSchemaConfigLoader.class);
@@ -70,8 +73,18 @@ public class TableSchemaConfigLoader {
         public void setDescription(String description) { this.description = description; }
         public boolean isNullable() { return nullable; }
         public void setNullable(boolean nullable) { this.nullable = nullable; }
+
+        @JsonProperty("is_primary_key")
         public boolean isPrimaryKey() { return isPrimaryKey; }
         public void setPrimaryKey(boolean primaryKey) { isPrimaryKey = primaryKey; }
+    }
+
+    // 内部类，用于 Jackson 反序列化
+    private static class InternalConfig {
+        private List<TableConfig> tables;
+
+        public List<TableConfig> getTables() { return tables; }
+        public void setTables(List<TableConfig> tables) { this.tables = tables; }
     }
 
     /**
@@ -99,16 +112,18 @@ public class TableSchemaConfigLoader {
     public void loadConfig(String configPath) {
         try {
             ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
+            mapper.setPropertyNamingStrategy(com.fasterxml.jackson.databind.PropertyNamingStrategies.SNAKE_CASE);
+            mapper.configure(com.fasterxml.jackson.databind.MapperFeature.ACCEPT_CASE_INSENSITIVE_PROPERTIES, true);
             File configFile = new File(configPath);
 
             if (!configFile.exists()) {
                 log.warn("配置文件/目录不存在：{}, 尝试从 classpath 加载", configPath);
                 if (getClass().getClassLoader().getResourceAsStream("table-schema.yaml") != null) {
-                    TableSchemaConfigLoader loaded = mapper.readValue(
+                    InternalConfig internal = mapper.readValue(
                         getClass().getClassLoader().getResourceAsStream("table-schema.yaml"),
-                        TableSchemaConfigLoader.class
+                        InternalConfig.class
                     );
-                    this.tables = loaded.tables;
+                    this.tables = internal.tables;
                     rebuildTableMap();
                 } else {
                     throw new RuntimeException("无法找到配置文件 table-schema.yaml");
@@ -123,8 +138,8 @@ public class TableSchemaConfigLoader {
                 this.lastModified = getLastModifiedInDirectory(configFile);
             } else {
                 // 从单文件加载
-                TableSchemaConfigLoader loaded = mapper.readValue(configFile, TableSchemaConfigLoader.class);
-                this.tables = loaded.tables;
+                InternalConfig internal = mapper.readValue(configFile, InternalConfig.class);
+                this.tables = internal.tables;
                 rebuildTableMap();
                 this.lastModified = configFile.lastModified();
             }
@@ -166,9 +181,9 @@ public class TableSchemaConfigLoader {
         for (File yamlFile : yamlFiles) {
             try {
                 log.info("加载表配置文件：{}", yamlFile.getName());
-                TableSchemaConfigLoader loaded = mapper.readValue(yamlFile, TableSchemaConfigLoader.class);
-                if (loaded.tables != null) {
-                    allTables.addAll(loaded.tables);
+                InternalConfig internal = mapper.readValue(yamlFile, InternalConfig.class);
+                if (internal.tables != null) {
+                    allTables.addAll(internal.tables);
                 }
             } catch (Exception e) {
                 log.error("加载配置文件 {} 失败：{}", yamlFile.getName(), e.getMessage());

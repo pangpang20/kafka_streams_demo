@@ -94,6 +94,8 @@ public class ConfigurableConsumer {
         // 2. 确定配置文件路径
         String schemaConfigPath;
         String ruleConfigPath;
+        String connectionConfigPath = "src/main/resources/connection-config.yaml";
+        String appConfigPath = "src/main/resources/app-config.yaml";
 
         if (parsedArgs.useConfigDir()) {
             // 从配置目录加载
@@ -111,9 +113,10 @@ public class ConfigurableConsumer {
             if (new File(schemasDir).exists()) {
                 schemaConfigPath = schemasDir;
             } else {
-                // 查找第一个 YAML 文件作为 schema
+                // 查找包含 schema 或 table 的 YAML 文件
                 File[] yamlFiles = dir.listFiles((d, name) ->
-                    name.endsWith(".yaml") || name.endsWith(".yml"));
+                    (name.endsWith(".yaml") || name.endsWith(".yml")) &&
+                    (name.toLowerCase().contains("schema") || name.toLowerCase().contains("table")));
                 if (yamlFiles != null && yamlFiles.length > 0) {
                     schemaConfigPath = yamlFiles[0].getAbsolutePath();
                 } else {
@@ -138,6 +141,10 @@ public class ConfigurableConsumer {
                     return;
                 }
             }
+
+            // 设置 connection-config.yaml 和 app-config.yaml 的路径
+            connectionConfigPath = configDir + "/connection-config.yaml";
+            appConfigPath = configDir + "/app-config.yaml";
 
             System.out.println("配置目录：" + configDir);
             System.out.println("Schema 配置：" + schemaConfigPath);
@@ -181,8 +188,8 @@ public class ConfigurableConsumer {
         try {
             // 3. 加载配置
             System.out.println("正在加载配置文件...");
-            ConnectionConfigLoader connectionConfig = new ConnectionConfigLoader("src/main/resources/connection-config.yaml");
-            AppConfigLoader appConfig = new AppConfigLoader("src/main/resources/app-config.yaml");
+            ConnectionConfigLoader connectionConfig = new ConnectionConfigLoader(connectionConfigPath);
+            AppConfigLoader appConfig = new AppConfigLoader(appConfigPath);
 
             // 如果命令行指定了 topic，覆盖配置
             if (parsedArgs.topic != null) {

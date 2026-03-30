@@ -1,13 +1,12 @@
 package com.kafka.consumer.config;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.InputStream;
 import java.util.Properties;
 
 /**
@@ -18,14 +17,16 @@ import java.util.Properties;
  * @author Kafka Demo
  * @version 1.0.0
  */
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class ConnectionConfigLoader {
 
     private static final Logger log = LoggerFactory.getLogger(ConnectionConfigLoader.class);
 
     private static final String DEFAULT_CONFIG_PATH = "src/main/resources/connection-config.yaml";
 
-    private KafkaConfig kafkaConfig;
-    private OceanBaseConfig oceanBaseConfig;
+    private KafkaConfig kafka;
+    private OceanBaseConfig oceanbase;
+    private DatabaseConfig database;
 
     /**
      * Kafka 配置
@@ -110,10 +111,19 @@ public class ConnectionConfigLoader {
     }
 
     /**
-     * 默认构造函数，从默认路径加载配置
+     * 数据库表配置（可选）
      */
-    public ConnectionConfigLoader() {
-        this(DEFAULT_CONFIG_PATH);
+    public static class DatabaseConfig {
+        private String validTablePrefix;
+        private String invalidTablePrefix;
+        private Boolean autoCreateTables;
+
+        public String getValidTablePrefix() { return validTablePrefix; }
+        public void setValidTablePrefix(String validTablePrefix) { this.validTablePrefix = validTablePrefix; }
+        public String getInvalidTablePrefix() { return invalidTablePrefix; }
+        public void setInvalidTablePrefix(String invalidTablePrefix) { this.invalidTablePrefix = invalidTablePrefix; }
+        public Boolean getAutoCreateTables() { return autoCreateTables; }
+        public void setAutoCreateTables(Boolean autoCreateTables) { this.autoCreateTables = autoCreateTables; }
     }
 
     /**
@@ -133,23 +143,18 @@ public class ConnectionConfigLoader {
     public void loadConfig(String configPath) {
         try {
             ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
+            mapper.setPropertyNamingStrategy(com.fasterxml.jackson.databind.PropertyNamingStrategies.SNAKE_CASE);
             File configFile = new File(configPath);
 
             if (!configFile.exists()) {
-                log.warn("配置文件不存在：{}, 尝试从 classpath 加载", configPath);
-                InputStream is = getClass().getClassLoader().getResourceAsStream("connection-config.yaml");
-                if (is != null) {
-                    ConnectionConfigLoader loaded = mapper.readValue(is, ConnectionConfigLoader.class);
-                    this.kafkaConfig = loaded.kafkaConfig;
-                    this.oceanBaseConfig = loaded.oceanBaseConfig;
-                } else {
-                    throw new RuntimeException("无法找到配置文件 connection-config.yaml");
-                }
-            } else {
-                ConnectionConfigLoader loaded = mapper.readValue(configFile, ConnectionConfigLoader.class);
-                this.kafkaConfig = loaded.kafkaConfig;
-                this.oceanBaseConfig = loaded.oceanBaseConfig;
+                throw new RuntimeException("配置文件不存在：" + configPath);
             }
+
+            // 使用内部类来避免递归调用构造函数
+            InternalConfig internal = mapper.readValue(configFile, InternalConfig.class);
+            this.kafka = internal.kafka;
+            this.oceanbase = internal.oceanbase;
+            this.database = internal.database;
 
             log.info("连接配置加载成功：{}", configPath);
         } catch (Exception e) {
@@ -158,18 +163,39 @@ public class ConnectionConfigLoader {
         }
     }
 
+    // 内部类，用于 Jackson 反序列化
+    private static class InternalConfig {
+        private KafkaConfig kafka;
+        private OceanBaseConfig oceanbase;
+        private DatabaseConfig database;
+
+        public KafkaConfig getKafka() { return kafka; }
+        public void setKafka(KafkaConfig kafka) { this.kafka = kafka; }
+        public OceanBaseConfig getOceanbase() { return oceanbase; }
+        public void setOceanbase(OceanBaseConfig oceanbase) { this.oceanbase = oceanbase; }
+        public DatabaseConfig getDatabase() { return database; }
+        public void setDatabase(DatabaseConfig database) { this.database = database; }
+    }
+
     /**
      * 获取 Kafka 配置
      */
     public KafkaConfig getKafkaConfig() {
-        return kafkaConfig;
+        return kafka;
     }
 
     /**
      * 获取 OceanBase 配置
      */
     public OceanBaseConfig getOceanBaseConfig() {
-        return oceanBaseConfig;
+        return oceanbase;
+    }
+
+    /**
+     * 获取 Database 配置
+     */
+    public DatabaseConfig getDatabaseConfig() {
+        return database;
     }
 
     /**
@@ -177,18 +203,20 @@ public class ConnectionConfigLoader {
      */
     public Properties getKafkaProperties() {
         Properties props = new Properties();
-        props.put("bootstrap.servers", kafkaConfig.getBootstrapServers());
+        if (kafka != null) {
+            props.put("bootstrap.servers", kafka.getBootstrapServers());
 
-        if (kafkaConfig.getSecurity() != null && kafkaConfig.getSecurity().isEnabled()) {
-            SecurityConfig sec = kafkaConfig.getSecurity();
-            props.put("security.protocol", sec.getProtocol());
-            props.put("sasl.mechanism", sec.getMechanism());
+            if (kafka.getSecurity() != null && kafka.getSecurity().isEnabled()) {
+                SecurityConfig sec = kafka.getSecurity();
+                props.put("security.protocol", sec.getProtocol());
+                props.put("sasl.mechanism", sec.getMechanism());
 
-            String jaasConfig = String.format(
-                "org.apache.kafka.common.security.plain.PlainLoginModule required username=\"%s\" password=\"%s\";",
-                sec.getUsername(), sec.getPassword()
-            );
-            props.put("sasl.jaas.config", jaasConfig);
+                String jaasConfig = String.format(
+                    "org.apache.kafka.common.security.plain.PlainLoginModule required username=\"%s\" password=\"%s\";",
+                    sec.getUsername(), sec.getPassword()
+                );
+                props.put("sasl.jaas.config", jaasConfig);
+            }
         }
 
         return props;
@@ -198,13 +226,11 @@ public class ConnectionConfigLoader {
      * 构建 OceanBase JDBC URL
      */
     public String getOceanBaseJdbcUrl() {
-        OceanBaseConfig ob = oceanBaseConfig;
+        if (oceanbase == null) return null;
+        OceanBaseConfig ob = oceanbase;
         return String.format(
-            "jdbc:oceanbase://%s:%d/%s?useSSL=false&useUnicode=true&characterEncoding=utf8" +
-            "&connectTimeout=%d&socketTimeout=%d&allowPublicKeyRetrieval=true",
-            ob.getHost(), ob.getPort(), ob.getDatabase(),
-            ob.getPool() != null ? ob.getPool().getConnectionTimeoutMs() : 30000,
-            ob.getPool() != null ? ob.getPool().getIdleTimeoutMs() : 60000
+            "jdbc:mysql://%s:%d/%s?useSSL=false&allowPublicKeyRetrieval=true",
+            ob.getHost(), ob.getPort(), ob.getDatabase()
         );
     }
 
@@ -215,24 +241,35 @@ public class ConnectionConfigLoader {
         System.out.println("=====================================");
         System.out.println("连接配置信息");
         System.out.println("=====================================");
-        System.out.println("Kafka Bootstrap Servers: " + kafkaConfig.getBootstrapServers());
-        if (kafkaConfig.getSecurity() != null && kafkaConfig.getSecurity().isEnabled()) {
-            System.out.println("Kafka SASL 认证：已启用");
-            System.out.println("  安全协议：" + kafkaConfig.getSecurity().getProtocol());
-            System.out.println("  认证机制：" + kafkaConfig.getSecurity().getMechanism());
-            System.out.println("  用户名：" + kafkaConfig.getSecurity().getUsername());
-        } else {
-            System.out.println("Kafka SASL 认证：未启用");
+        if (kafka != null) {
+            System.out.println("Kafka Bootstrap Servers: " + kafka.getBootstrapServers());
+            if (kafka.getSecurity() != null && kafka.getSecurity().isEnabled()) {
+                System.out.println("Kafka SASL 认证：已启用");
+                System.out.println("  安全协议：" + kafka.getSecurity().getProtocol());
+                System.out.println("  认证机制：" + kafka.getSecurity().getMechanism());
+                System.out.println("  用户名：" + kafka.getSecurity().getUsername());
+            } else {
+                System.out.println("Kafka SASL 认证：未启用");
+            }
         }
         System.out.println("-------------------------------------");
-        System.out.println("OceanBase 连接:");
-        System.out.println("  Host: " + oceanBaseConfig.getHost() + ":" + oceanBaseConfig.getPort());
-        System.out.println("  用户名：" + oceanBaseConfig.getUsername());
-        System.out.println("  数据库：" + oceanBaseConfig.getDatabase());
-        if (oceanBaseConfig.getPool() != null) {
-            System.out.println("  连接池配置:");
-            System.out.println("    最大连接数：" + oceanBaseConfig.getPool().getMaxPoolSize());
-            System.out.println("    最小空闲：" + oceanBaseConfig.getPool().getMinIdle());
+        if (oceanbase != null) {
+            System.out.println("OceanBase 连接:");
+            System.out.println("  Host: " + oceanbase.getHost() + ":" + oceanbase.getPort());
+            System.out.println("  用户名：" + oceanbase.getUsername());
+            System.out.println("  数据库：" + oceanbase.getDatabase());
+            if (oceanbase.getPool() != null) {
+                System.out.println("  连接池配置:");
+                System.out.println("    最大连接数：" + oceanbase.getPool().getMaxPoolSize());
+                System.out.println("    最小空闲：" + oceanbase.getPool().getMinIdle());
+            }
+        }
+        if (database != null) {
+            System.out.println("-------------------------------------");
+            System.out.println("Database 表配置:");
+            System.out.println("  正常数据表前缀：" + (database.getValidTablePrefix() != null ? database.getValidTablePrefix() : "(空)"));
+            System.out.println("  异议数据表前缀：" + (database.getInvalidTablePrefix() != null ? database.getInvalidTablePrefix() : "(空)"));
+            System.out.println("  自动建表：" + (database.getAutoCreateTables() != null ? database.getAutoCreateTables() : "false"));
         }
         System.out.println("=====================================");
     }
