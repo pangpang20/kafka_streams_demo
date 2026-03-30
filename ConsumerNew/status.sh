@@ -130,7 +130,7 @@ show_task_status() {
     echo -e "启动时间：   ${BLUE}$(format_timestamp ${START_TIME})${NC}"
 
     # 检查进程状态
-    local proc_status=$(is_process_running $PID)
+    local proc_status=$(is_process_running_cached $PID)
     if [ "$proc_status" = "true" ]; then
         echo -e "进程状态：   ${GREEN}运行中 (PID: ${PID})${NC}"
     else
@@ -400,7 +400,7 @@ main() {
             if [ -d "$TASK_DIR" ]; then
                 for task_file in "$TASK_DIR"/*.task; do
                     if [ -f "$task_file" ]; then
-                        local file_task_id=$(grep "^TASK_ID=" "$task_file" 2>/dev/null | cut -d'=' -f2)
+                        local file_task_id=$(grep "^TASK_ID=" "$task_file" 2>/dev/null | cut -d'=' -f2 | tr -d '"')
                         if [ "$file_task_id" = "$task_id" ]; then
                             show_task_status "$task_file"
                             found=true

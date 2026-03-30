@@ -40,8 +40,8 @@ find_task_file() {
     if [ -d "$TASK_DIR" ]; then
         for f in "$TASK_DIR"/*.task; do
             if [ -f "$f" ]; then
-                source "$f"
-                if [ "$TASK_ID" = "$task_id" ]; then
+                local file_task_id=$(grep "^TASK_ID=" "$f" 2>/dev/null | cut -d'=' -f2 | tr -d '"')
+                if [ "$file_task_id" = "$task_id" ]; then
                     echo "$f"
                     return 0
                 fi
