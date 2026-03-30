@@ -117,6 +117,8 @@ public class ConnectionConfigLoader {
         private String validTablePrefix;
         private String invalidTablePrefix;
         private Boolean autoCreateTables;
+        private String validDatabase;
+        private String invalidDatabase;
 
         public String getValidTablePrefix() { return validTablePrefix; }
         public void setValidTablePrefix(String validTablePrefix) { this.validTablePrefix = validTablePrefix; }
@@ -124,6 +126,10 @@ public class ConnectionConfigLoader {
         public void setInvalidTablePrefix(String invalidTablePrefix) { this.invalidTablePrefix = invalidTablePrefix; }
         public Boolean getAutoCreateTables() { return autoCreateTables; }
         public void setAutoCreateTables(Boolean autoCreateTables) { this.autoCreateTables = autoCreateTables; }
+        public String getValidDatabase() { return validDatabase; }
+        public void setValidDatabase(String validDatabase) { this.validDatabase = validDatabase; }
+        public String getInvalidDatabase() { return invalidDatabase; }
+        public void setInvalidDatabase(String invalidDatabase) { this.invalidDatabase = invalidDatabase; }
     }
 
     /**

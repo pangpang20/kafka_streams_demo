@@ -28,3 +28,14 @@ oceanbase:
     connection_timeout_ms: 30000
     idle_timeout_ms: 600000
     max_lifetime_ms: 1800000
+
+# 数据库表配置
+database:
+  # 正常数据表所在数据库
+  valid_database: "std_db"
+  # 异议数据表所在数据库
+  invalid_database: "kafka_quality_check"
+  # 异议数据表名前缀
+  invalid_table_prefix: "e_"
+  # 是否自动创建表
+  auto_create_tables: true

@@ -31,6 +31,8 @@ public class MultiTableDataWriter {
 
     private final HikariDataSource dataSource;
     private final String databaseName;
+    private final String validDatabaseName;
+    private final String invalidDatabaseName;
     private final String invalidTablePrefix;
     private final boolean writeToOceanbase;
     private final TableSchemaConfigLoader schemaConfig;
@@ -54,8 +56,26 @@ public class MultiTableDataWriter {
     public MultiTableDataWriter(ConnectionConfigLoader connectionConfig,
                                  TableSchemaConfigLoader schemaConfig,
                                  AppConfigLoader appConfig) {
-        this.databaseName = connectionConfig.getOceanBaseConfig().getDatabase();
-        this.invalidTablePrefix = appConfig.getSource().getInvalidTablePrefix();
+        // 从配置中获取数据库名，支持双数据库配置
+        ConnectionConfigLoader.DatabaseConfig dbConfig = connectionConfig.getDatabaseConfig();
+        String baseDbName = connectionConfig.getOceanBaseConfig().getDatabase();
+
+        if (dbConfig != null && dbConfig.getValidDatabase() != null) {
+            this.validDatabaseName = dbConfig.getValidDatabase();
+        } else {
+            this.validDatabaseName = baseDbName;
+        }
+
+        if (dbConfig != null && dbConfig.getInvalidDatabase() != null) {
+            this.invalidDatabaseName = dbConfig.getInvalidDatabase();
+        } else {
+            this.invalidDatabaseName = baseDbName;
+        }
+
+        // 默认使用 validDatabaseName 作为 databaseName（兼容旧代码）
+        this.databaseName = this.validDatabaseName;
+
+        this.invalidTablePrefix = appConfig.getSource() != null ? appConfig.getSource().getInvalidTablePrefix() : "e_";
         this.writeToOceanbase = appConfig.isWriteToOceanbase();
         this.schemaConfig = schemaConfig;
 
@@ -128,17 +148,19 @@ public class MultiTableDataWriter {
      * 创建表（正常数据表和异议数据表）
      */
     private void createTablesIfNotExists(ConnectionConfigLoader connectionConfig, String tableName) {
-        // 创建正常数据表
+        // 创建正常数据表（使用 validDatabaseName）
         String validSql = schemaConfig.generateCreateTableSQL(
-            tableName, databaseName
+            tableName, validDatabaseName
         );
         executeSql(validSql);
+        log.info("创建正常数据表：{}.{}", validDatabaseName, tableName);
 
-        // 创建异议数据表
+        // 创建异议数据表（使用 invalidDatabaseName）
         String invalidSql = schemaConfig.generateInvalidTableSQL(
-            tableName, databaseName, invalidTablePrefix
+            tableName, invalidDatabaseName, invalidTablePrefix
         );
         executeSql(invalidSql);
+        log.info("创建异议数据表：{}.{}{}", invalidDatabaseName, invalidTablePrefix, tableName);
     }
 
     /**
@@ -308,7 +330,9 @@ public class MultiTableDataWriter {
      */
     private String buildInsertSql(String tableName, List<String> fields, boolean isInvalid) {
         StringBuilder sql = new StringBuilder();
-        sql.append("INSERT INTO ").append(databaseName).append(".").append(tableName).append(" (");
+        // 根据是否为异议数据选择数据库
+        String dbName = isInvalid ? invalidDatabaseName : validDatabaseName;
+        sql.append("INSERT INTO ").append(dbName).append(".").append(tableName).append(" (");
         sql.append("record_key, record_timestamp, opcode, ");
         for (String field : fields) {
             sql.append(field).append(", ");

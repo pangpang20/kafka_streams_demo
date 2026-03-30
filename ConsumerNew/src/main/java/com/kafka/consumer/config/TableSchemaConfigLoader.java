@@ -320,10 +320,7 @@ public class TableSchemaConfigLoader {
             if (!field.isNullable()) {
                 sql.append(" NOT NULL");
             }
-            if (i < table.getFields().size() - 1) {
-                sql.append(",");
-            }
-            sql.append("\n");
+            sql.append(",\n");
         }
 
         sql.append("  record_key VARCHAR(500),\n");
@@ -361,10 +358,7 @@ public class TableSchemaConfigLoader {
             if (!field.isNullable()) {
                 sql.append(" NOT NULL");
             }
-            if (i < table.getFields().size() - 1) {
-                sql.append(",");
-            }
-            sql.append("\n");
+            sql.append(",\n");
         }
 
         sql.append("  record_key VARCHAR(500),\n");

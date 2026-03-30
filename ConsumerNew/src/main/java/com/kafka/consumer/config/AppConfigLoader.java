@@ -55,6 +55,7 @@ public class AppConfigLoader {
         private boolean skipValidation;
         private boolean autoCreateTable;
         private boolean writeToTopic;
+        private boolean writeToDb;
         private String validDataTopic;
         private String invalidDataTopic;
         private boolean writeToOceanbase;
@@ -72,6 +73,8 @@ public class AppConfigLoader {
         public void setAutoCreateTable(boolean autoCreateTable) { this.autoCreateTable = autoCreateTable; }
         public boolean isWriteToTopic() { return writeToTopic; }
         public void setWriteToTopic(boolean writeToTopic) { this.writeToTopic = writeToTopic; }
+        public boolean isWriteToDb() { return writeToDb; }
+        public void setWriteToDb(boolean writeToDb) { this.writeToDb = writeToDb; }
         public String getValidDataTopic() { return validDataTopic; }
         public void setValidDataTopic(String validDataTopic) { this.validDataTopic = validDataTopic; }
         public String getInvalidDataTopic() { return invalidDataTopic; }

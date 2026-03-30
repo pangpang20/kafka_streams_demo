@@ -22,3 +22,13 @@ tables:
     enabled: true
     # 需要质检
     skip_validation: false
+    # 自动建表
+    auto_create_table: true
+    # 写入配置
+    write_to_topic: true
+    write_to_db: true
+    write_to_oceanbase: true
+    valid_data_topic: "baseinfo-valid-topic"
+    invalid_data_topic: "baseinfo-invalid-topic"
+    # 表前缀配置
+    invalid_table_prefix: "e_"
