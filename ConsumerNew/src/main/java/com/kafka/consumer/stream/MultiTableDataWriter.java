@@ -338,11 +338,14 @@ public class MultiTableDataWriter {
         }
 
         if (isInvalid) {
+            // 异议数据管理字段
+            sql.append("record_id, dw_insert_time, dispute_settlement_time, rule_description, ");
+            sql.append("dispute_ticket_no, inspection_job_id, source, source_dept_id, ");
             sql.append("failure_summary, error_fields, error_details, ");
         }
 
         sql.append("raw_data, log_timestamp) VALUES (");
-        int paramCount = 4 + fields.size() + (isInvalid ? 3 : 0);
+        int paramCount = 4 + fields.size() + (isInvalid ? 11 : 0);
         for (int i = 0; i < paramCount; i++) {
             sql.append("?");
             if (i < paramCount - 1) {
@@ -396,6 +399,16 @@ public class MultiTableDataWriter {
             pstmt.setObject(idx++, fieldValues.get(field));
         }
 
+        // 异议数据管理字段
+        pstmt.setNull(idx++, java.sql.Types.BIGINT);  // record_id (自增，设为 NULL)
+        pstmt.setTimestamp(idx++, new Timestamp(System.currentTimeMillis()));  // dw_insert_time
+        pstmt.setNull(idx++, java.sql.Types.TIMESTAMP);  // dispute_settlement_time (核销时填充)
+        pstmt.setString(idx++, buildRuleDescription(result));  // rule_description
+        pstmt.setNull(idx++, java.sql.Types.VARCHAR);  // dispute_ticket_no (处理时生成)
+        pstmt.setNull(idx++, java.sql.Types.VARCHAR);  // inspection_job_id (可扩展)
+        pstmt.setString(idx++, "数据治理");  // source
+        pstmt.setNull(idx++, java.sql.Types.VARCHAR);  // source_dept_id (可扩展)
+
         // 设置质量检查结果
         ProcessingResult.ValidationSummary summary = result.getValidationSummary();
         pstmt.setString(idx++, summary != null ? summary.getErrorSummary() : null);
@@ -406,6 +419,20 @@ public class MultiTableDataWriter {
         pstmt.setTimestamp(idx++, new Timestamp(System.currentTimeMillis()));
 
         pstmt.addBatch();
+    }
+
+    /**
+     * 构建规则描述
+     */
+    private String buildRuleDescription(ProcessingResult result) {
+        ProcessingResult.ValidationSummary summary = result.getValidationSummary();
+        if (summary == null) return null;
+        // 格式：规则类型 + 规则表达式
+        String errorFields = summary.getErrorFields();
+        if (errorFields != null && !errorFields.isEmpty()) {
+            return "字段验证失败：[" + errorFields + "]";
+        }
+        return summary.getErrorSummary();
     }
 
     /**

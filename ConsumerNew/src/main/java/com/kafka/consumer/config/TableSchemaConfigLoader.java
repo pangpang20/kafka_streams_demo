@@ -361,6 +361,16 @@ public class TableSchemaConfigLoader {
             sql.append(",\n");
         }
 
+        // 异议数据管理字段（用于数据治理场景下的全生命周期管理）
+        sql.append("  record_id BIGINT AUTO_INCREMENT,\n");
+        sql.append("  dw_insert_time DATETIME,\n");
+        sql.append("  dispute_settlement_time DATETIME,\n");
+        sql.append("  rule_description VARCHAR(500),\n");
+        sql.append("  dispute_ticket_no VARCHAR(100),\n");
+        sql.append("  inspection_job_id VARCHAR(100),\n");
+        sql.append("  source VARCHAR(50) DEFAULT '数据治理',\n");
+        sql.append("  source_dept_id VARCHAR(50),\n");
+        // 原有字段
         sql.append("  record_key VARCHAR(500),\n");
         sql.append("  record_timestamp DATETIME,\n");
         sql.append("  opcode VARCHAR(10),\n");
