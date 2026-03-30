@@ -1,5 +1,8 @@
 package com.kafka.consumer.model;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+
 /**
  * 处理结果
  *
@@ -20,6 +23,18 @@ public class ProcessingResult {
     private CdcEvent.DataRecord record;
     private String rawJson;
     private ValidationSummary validationSummary;
+
+    // 异议数据管理字段（用于数据治理场景下的全生命周期管理）
+    private String recordId;
+    private String dwInsertTime;
+    private String disputeSettlementTime;
+    private String ruleDescription;
+    private String disputeTicketNo;
+    private String inspectionJobId;
+    private String source;
+    private String sourceDeptId;
+
+    private static final DateTimeFormatter DATETIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     public ProcessingResult() {
         this.success = true;
@@ -56,6 +71,31 @@ public class ProcessingResult {
     public void setValidationSummary(ValidationSummary validationSummary) {
         this.validationSummary = validationSummary;
     }
+
+    // 异议数据管理字段 getter/setter
+    public String getRecordId() { return recordId; }
+    public void setRecordId(String recordId) { this.recordId = recordId; }
+
+    public String getDwInsertTime() { return dwInsertTime; }
+    public void setDwInsertTime(String dwInsertTime) { this.dwInsertTime = dwInsertTime; }
+
+    public String getDisputeSettlementTime() { return disputeSettlementTime; }
+    public void setDisputeSettlementTime(String disputeSettlementTime) { this.disputeSettlementTime = disputeSettlementTime; }
+
+    public String getRuleDescription() { return ruleDescription; }
+    public void setRuleDescription(String ruleDescription) { this.ruleDescription = ruleDescription; }
+
+    public String getDisputeTicketNo() { return disputeTicketNo; }
+    public void setDisputeTicketNo(String disputeTicketNo) { this.disputeTicketNo = disputeTicketNo; }
+
+    public String getInspectionJobId() { return inspectionJobId; }
+    public void setInspectionJobId(String inspectionJobId) { this.inspectionJobId = inspectionJobId; }
+
+    public String getSource() { return source; }
+    public void setSource(String source) { this.source = source; }
+
+    public String getSourceDeptId() { return sourceDeptId; }
+    public void setSourceDeptId(String sourceDeptId) { this.sourceDeptId = sourceDeptId; }
 
     /**
      * 验证摘要
@@ -130,6 +170,11 @@ public class ProcessingResult {
         summary.setErrorFields(errorFields);
         summary.setErrorDetails(errorDetails);
         result.setValidationSummary(summary);
+
+        // 填充异议数据管理字段
+        result.setDwInsertTime(LocalDateTime.now().format(DATETIME_FORMATTER));
+        result.setRuleDescription("字段验证失败：[" + (errorFields != null ? errorFields : errorSummary) + "]");
+        result.setSource("数据治理");
 
         return result;
     }
