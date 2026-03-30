@@ -332,24 +332,35 @@ public class MultiTableDataWriter {
         // 根据是否为异议数据选择数据库
         String dbName = isInvalid ? invalidDatabaseName : validDatabaseName;
         sql.append("INSERT INTO ").append(dbName).append(".").append(tableName).append(" (");
-        sql.append("record_key, record_timestamp, opcode, ");
-        for (String field : fields) {
-            sql.append(field).append(", ");
-        }
 
         if (isInvalid) {
-            // 异议数据管理字段
+            // 异议数据：业务字段 + 管理字段
+            for (String field : fields) {
+                sql.append(field).append(", ");
+            }
             sql.append("record_id, dw_insert_time, dispute_settlement_time, rule_description, ");
             sql.append("dispute_ticket_no, inspection_job_id, source, source_dept_id, ");
-            sql.append("failure_summary, error_fields, error_details, ");
-        }
-
-        sql.append("raw_data, log_timestamp) VALUES (");
-        int paramCount = 4 + fields.size() + (isInvalid ? 11 : 0);
-        for (int i = 0; i < paramCount; i++) {
-            sql.append("?");
-            if (i < paramCount - 1) {
-                sql.append(", ");
+            sql.append("log_timestamp) VALUES (");
+            int paramCount = fields.size() + 9;
+            for (int i = 0; i < paramCount; i++) {
+                sql.append("?");
+                if (i < paramCount - 1) {
+                    sql.append(", ");
+                }
+            }
+        } else {
+            // 正常数据
+            sql.append("record_key, record_timestamp, opcode, ");
+            for (String field : fields) {
+                sql.append(field).append(", ");
+            }
+            sql.append("raw_data, log_timestamp) VALUES (");
+            int paramCount = 4 + fields.size();
+            for (int i = 0; i < paramCount; i++) {
+                sql.append("?");
+                if (i < paramCount - 1) {
+                    sql.append(", ");
+                }
             }
         }
         sql.append(")");
@@ -387,12 +398,6 @@ public class MultiTableDataWriter {
     private void addInvalidBatch(PreparedStatement pstmt, ProcessingResult result, List<String> fields) throws SQLException {
         int idx = 1;
 
-        pstmt.setString(idx++, result.getRecordKey());
-        // 使用毫秒精度时间戳，避免 OceanBase 不支持纳秒精度的问题
-        String recordTimestamp = String.format("%tF %<tH:%<tM:%<tS.%1$tL", System.currentTimeMillis());
-        pstmt.setString(idx++, recordTimestamp);
-        pstmt.setString(idx++, result.getOpcode());
-
         // 设置业务字段
         Map<String, Object> fieldValues = extractFieldValues(result);
         for (String field : fields) {
@@ -408,15 +413,7 @@ public class MultiTableDataWriter {
         pstmt.setNull(idx++, java.sql.Types.VARCHAR);  // inspection_job_id (可扩展)
         pstmt.setString(idx++, "数据治理");  // source
         pstmt.setNull(idx++, java.sql.Types.VARCHAR);  // source_dept_id (可扩展)
-
-        // 设置质量检查结果
-        ProcessingResult.ValidationSummary summary = result.getValidationSummary();
-        pstmt.setString(idx++, summary != null ? summary.getErrorSummary() : null);
-        pstmt.setString(idx++, summary != null ? summary.getErrorFields() : null);
-        pstmt.setString(idx++, summary != null ? summary.getErrorDetails() : null);
-
-        pstmt.setString(idx++, result.getRawJson());
-        pstmt.setTimestamp(idx++, new Timestamp(System.currentTimeMillis()));
+        pstmt.setTimestamp(idx++, new Timestamp(System.currentTimeMillis()));  // log_timestamp
 
         pstmt.addBatch();
     }

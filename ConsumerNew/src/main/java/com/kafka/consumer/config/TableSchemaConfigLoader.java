@@ -352,6 +352,7 @@ public class TableSchemaConfigLoader {
         sql.append("CREATE TABLE IF NOT EXISTS ").append(databaseName).append(".").append(actualTableName).append(" (\n");
         sql.append("  id BIGINT AUTO_INCREMENT PRIMARY KEY,\n");
 
+        // 业务字段（来自配置）
         for (int i = 0; i < table.getFields().size(); i++) {
             FieldConfig field = table.getFields().get(i);
             sql.append("  ").append(field.getName()).append(" ").append(getSqlType(field.getType()));
@@ -370,14 +371,6 @@ public class TableSchemaConfigLoader {
         sql.append("  inspection_job_id VARCHAR(100),\n");
         sql.append("  source VARCHAR(50) DEFAULT '数据治理',\n");
         sql.append("  source_dept_id VARCHAR(50),\n");
-        // 原有字段
-        sql.append("  record_key VARCHAR(500),\n");
-        sql.append("  record_timestamp DATETIME,\n");
-        sql.append("  opcode VARCHAR(10),\n");
-        sql.append("  failure_summary TEXT,\n");
-        sql.append("  error_fields TEXT,\n");
-        sql.append("  error_details JSON,\n");
-        sql.append("  raw_data JSON,\n");
         sql.append("  log_timestamp DATETIME DEFAULT CURRENT_TIMESTAMP\n");
         sql.append(")");
 
