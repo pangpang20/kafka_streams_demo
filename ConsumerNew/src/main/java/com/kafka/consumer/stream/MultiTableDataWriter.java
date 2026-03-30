@@ -349,13 +349,14 @@ public class MultiTableDataWriter {
                 }
             }
         } else {
-            // 正常数据
-            sql.append("record_key, record_timestamp, opcode, ");
+            // 正常数据：只保存业务字段
             for (String field : fields) {
                 sql.append(field).append(", ");
             }
-            sql.append("raw_data, log_timestamp) VALUES (");
-            int paramCount = 4 + fields.size();
+            // 移除最后的逗号和空格，添加右括号
+            sql.setLength(sql.length() - 2);
+            sql.append(") VALUES (");
+            int paramCount = fields.size();
             for (int i = 0; i < paramCount; i++) {
                 sql.append("?");
                 if (i < paramCount - 1) {
@@ -372,22 +373,12 @@ public class MultiTableDataWriter {
      * 添加正常数据到批处理
      */
     private void addValidBatch(PreparedStatement pstmt, ProcessingResult result, List<String> fields) throws SQLException {
-        int idx = 1;
-
-        pstmt.setString(idx++, result.getRecordKey());
-        // 使用毫秒精度时间戳，避免 OceanBase 不支持纳秒精度的问题
-        String recordTimestamp = String.format("%tF %<tH:%<tM:%<tS.%1$tL", System.currentTimeMillis());
-        pstmt.setString(idx++, recordTimestamp);
-        pstmt.setString(idx++, result.getOpcode());
-
-        // 设置业务字段
+        // 只设置业务字段值
         Map<String, Object> fieldValues = extractFieldValues(result);
+        int idx = 1;
         for (String field : fields) {
             pstmt.setObject(idx++, fieldValues.get(field));
         }
-
-        pstmt.setString(idx++, result.getRawJson());
-        pstmt.setTimestamp(idx++, new Timestamp(System.currentTimeMillis()));
 
         pstmt.addBatch();
     }
@@ -406,14 +397,17 @@ public class MultiTableDataWriter {
 
         // 异议数据管理字段
         pstmt.setNull(idx++, java.sql.Types.BIGINT);  // record_id (自增，设为 NULL)
-        pstmt.setTimestamp(idx++, new Timestamp(System.currentTimeMillis()));  // dw_insert_time
+        // 使用毫秒精度时间戳字符串，避免 OceanBase 不支持 setTimestamp 的问题
+        String dwInsertTime = String.format("%tF %<tH:%<tM:%<tS.%1$tL", System.currentTimeMillis());
+        pstmt.setString(idx++, dwInsertTime);  // dw_insert_time
         pstmt.setNull(idx++, java.sql.Types.TIMESTAMP);  // dispute_settlement_time (核销时填充)
         pstmt.setString(idx++, buildRuleDescription(result));  // rule_description
         pstmt.setNull(idx++, java.sql.Types.VARCHAR);  // dispute_ticket_no (处理时生成)
         pstmt.setNull(idx++, java.sql.Types.VARCHAR);  // inspection_job_id (可扩展)
         pstmt.setString(idx++, "数据治理");  // source
         pstmt.setNull(idx++, java.sql.Types.VARCHAR);  // source_dept_id (可扩展)
-        pstmt.setTimestamp(idx++, new Timestamp(System.currentTimeMillis()));  // log_timestamp
+        String logTimestamp = String.format("%tF %<tH:%<tM:%<tS.%1$tL", System.currentTimeMillis());
+        pstmt.setString(idx++, logTimestamp);  // log_timestamp
 
         pstmt.addBatch();
     }

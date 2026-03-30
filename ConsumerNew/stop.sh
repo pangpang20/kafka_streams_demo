@@ -5,6 +5,7 @@
 #
 # 选项:
 #   --help       显示帮助信息
+#   --archive    停止后归档任务文件到 stopped/ 目录
 #
 # 示例:
 #   ./stop.sh consumer-20260330-120000-12345
@@ -13,17 +14,19 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
 TASK_DIR="${SCRIPT_DIR}/.kafka_tasks"
+STOPPED_DIR="${TASK_DIR}/stopped"
 
 # 显示帮助
 show_help() {
-    echo "用法：$0 <task-id>"
+    echo "用法：$0 [选项] <task-id>"
     echo ""
     echo "选项:"
-    echo "  --help   显示帮助"
+    echo "  --help, -h    显示帮助"
+    echo "  --archive, -a 停止后归档任务文件到 stopped/ 目录"
     echo ""
     echo "示例:"
     echo "  $0 consumer-20260330-120000-12345"
-    echo "  $0 my-task-001"
+    echo "  $0 --archive my-task-001"
 }
 
 # 查找任务文件

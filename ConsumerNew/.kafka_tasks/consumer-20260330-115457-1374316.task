@@ -1,0 +1,6 @@
+# Kafka Consumer 任务信息
+TASK_ID="consumer-20260330-115457-1374316"
+APP_NAME="ConsumerNew"
+CONFIG_DIR="config01"
+PID="1374322"
+START_TIME=1774842897909

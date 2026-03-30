@@ -23,7 +23,7 @@ tables:
         type: "regex"
         description: "电话号码必须符合中国手机号格式"
         enabled: true
-        pattern: "^1[3-9]\\d{9}$"
+        pattern: "^1[3-9][0-9]{9}$"
 
       # 血型验证规则
       - field: "bloodtype"

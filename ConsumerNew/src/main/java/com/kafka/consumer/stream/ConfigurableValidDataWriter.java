@@ -13,7 +13,6 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Timestamp;
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -56,7 +55,7 @@ public class ConfigurableValidDataWriter {
             createTableIfNotExists(connectionConfig, tableSchemaConfig);
         }
 
-        log.info("ConfigurableValidDataWriter 初始化完成，表名：{}", tableName);
+        log.info("ConfigurableValidDataWriter 初始化完成，表名：{}, 业务字段：{}", tableName, fieldNames);
     }
 
     /**
@@ -111,26 +110,65 @@ public class ConfigurableValidDataWriter {
     }
 
     /**
-     * 创建表
+     * 创建表（只包含业务字段）
      */
     private void createTableIfNotExists(ConnectionConfigLoader connectionConfig,
                                          TableSchemaConfigLoader tableSchemaConfig) {
-        String sql = tableSchemaConfig.generateCreateTableSQL(
-            tableName,
-            connectionConfig.getOceanBaseConfig().getDatabase()
-        );
+        // 生成只包含业务字段的建表 SQL
+        String sql = generateBusinessTableSQL(tableSchemaConfig, tableName,
+                connectionConfig.getOceanBaseConfig().getDatabase());
 
         try (Connection conn = dataSource.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.execute();
-            log.info("表创建成功：{}", tableName);
+            log.info("表创建成功：{} (只包含业务字段)", tableName);
         } catch (SQLException e) {
             log.error("创建表失败：{} - {}", tableName, e.getMessage());
         }
     }
 
     /**
-     * 写入正常数据
+     * 生成只包含业务字段的建表 SQL
+     */
+    private String generateBusinessTableSQL(TableSchemaConfigLoader schemaConfig, String tableName, String database) {
+        StringBuilder sql = new StringBuilder();
+        sql.append("CREATE TABLE IF NOT EXISTS ").append(database).append(".").append(tableName).append(" (\n");
+
+        TableSchemaConfigLoader.TableConfig table = schemaConfig.getTableByName(tableName);
+        List<String> primaryKeys = new ArrayList<>();
+
+        if (table != null && table.getFields() != null) {
+            List<String> fieldDefs = new ArrayList<>();
+            for (TableSchemaConfigLoader.FieldConfig field : table.getFields()) {
+                StringBuilder fieldSql = new StringBuilder();
+                fieldSql.append("  ").append(field.getName());
+                fieldSql.append(" ").append(field.getType());
+
+                if (!field.isNullable()) {
+                    fieldSql.append(" NOT NULL");
+                }
+
+                if (field.isPrimaryKey()) {
+                    primaryKeys.add(field.getName());
+                }
+
+                fieldDefs.add(fieldSql.toString());
+            }
+
+            sql.append(String.join(",\n", fieldDefs));
+
+            // 添加主键约束
+            if (!primaryKeys.isEmpty()) {
+                sql.append(",\n  PRIMARY KEY (").append(String.join(", ", primaryKeys)).append(")");
+            }
+        }
+
+        sql.append("\n)");
+        return sql.toString();
+    }
+
+    /**
+     * 写入正常数据（只包含业务字段）
      */
     public void logValidData(ProcessingResult result) {
         if (result == null || !result.isSuccess()) {
@@ -161,16 +199,22 @@ public class ConfigurableValidDataWriter {
 
         log.info("准备批量写入 {} 条记录到 OceanBase (valid_data)", toFlush.size());
 
+        // 只包含业务字段的 SQL
         StringBuilder sqlBuilder = new StringBuilder();
         sqlBuilder.append("INSERT INTO ").append(tableName).append(" (");
-        sqlBuilder.append("record_key, record_timestamp, opcode, ");
-        for (String field : fieldNames) {
-            sqlBuilder.append(field).append(", ");
+
+        // 只添加业务字段
+        for (int i = 0; i < fieldNames.size(); i++) {
+            sqlBuilder.append(fieldNames.get(i));
+            if (i < fieldNames.size() - 1) {
+                sqlBuilder.append(", ");
+            }
         }
-        sqlBuilder.append("raw_data, log_timestamp) VALUES (");
-        for (int i = 0; i < 4 + fieldNames.size(); i++) {
+
+        sqlBuilder.append(") VALUES (");
+        for (int i = 0; i < fieldNames.size(); i++) {
             sqlBuilder.append("?");
-            if (i < 4 + fieldNames.size() - 1) {
+            if (i < fieldNames.size() - 1) {
                 sqlBuilder.append(", ");
             }
         }
@@ -200,24 +244,14 @@ public class ConfigurableValidDataWriter {
     }
 
     /**
-     * 添加单条记录到批处理
+     * 添加单条记录到批处理（只包含业务字段）
      */
     private void addBatch(PreparedStatement pstmt, ProcessingResult result) throws SQLException {
-        int idx = 1;
-
-        pstmt.setString(idx++, result.getRecordKey());
-        pstmt.setString(idx++, LocalDateTime.now().toString());
-        pstmt.setString(idx++, result.getOpcode());
-
-        // 设置业务字段
+        // 只设置业务字段值
         Map<String, Object> fieldValues = extractFieldValues(result);
         for (String field : fieldNames) {
-            pstmt.setObject(idx++, fieldValues.get(field));
+            pstmt.setObject(fieldNames.indexOf(field) + 1, fieldValues.get(field));
         }
-
-        pstmt.setString(idx++, result.getRawJson());
-        pstmt.setTimestamp(idx++, Timestamp.valueOf(LocalDateTime.now()));
-
         pstmt.addBatch();
     }
 

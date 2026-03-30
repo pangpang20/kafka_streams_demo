@@ -13,7 +13,6 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Timestamp;
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -207,7 +206,9 @@ public class ConfigurableInvalidDataWriter {
         int idx = 1;
 
         pstmt.setString(idx++, result.getRecordKey());
-        pstmt.setString(idx++, LocalDateTime.now().toString());
+        // 使用毫秒精度时间戳，避免 OceanBase 不支持纳秒精度的问题
+        String recordTimestamp = String.format("%tF %<tH:%<tM:%<tS.%1$tL", System.currentTimeMillis());
+        pstmt.setString(idx++, recordTimestamp);
         pstmt.setString(idx++, result.getOpcode());
 
         // 设置业务字段
@@ -223,7 +224,8 @@ public class ConfigurableInvalidDataWriter {
         pstmt.setString(idx++, summary != null ? summary.getErrorDetails() : null);
 
         pstmt.setString(idx++, result.getRawJson());
-        pstmt.setTimestamp(idx++, Timestamp.valueOf(LocalDateTime.now()));
+        // 使用毫秒精度时间戳，避免 OceanBase 不支持纳秒精度的问题
+        pstmt.setTimestamp(idx++, new Timestamp(System.currentTimeMillis()));
 
         pstmt.addBatch();
     }

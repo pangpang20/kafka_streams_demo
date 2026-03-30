@@ -1,0 +1,8 @@
+# Kafka Consumer 任务信息
+TASK_ID="test-fix-014"
+APP_NAME="ConsumerNew"
+CONFIG_DIR="config01"
+PID="1506743"
+START_TIME="1774854984314"
+STOP_TIME=1774856488471
+STATUS="stopped"

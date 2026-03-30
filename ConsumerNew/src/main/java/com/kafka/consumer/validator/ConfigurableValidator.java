@@ -78,7 +78,7 @@ public class ConfigurableValidator {
     public ValidationResult validateField(String fieldName, Object value) {
         ValidationResult result = new ValidationResult();
 
-        // 如果值为 null，跳过验证（允许空值）
+        // 如果值为 null 或空，跳过验证（允许空值）
         if (value == null || value.toString().trim().isEmpty()) {
             return result;
         }
@@ -185,13 +185,21 @@ public class ConfigurableValidator {
             return;
         }
 
-        // 从缓存获取或编译正则
-        Pattern compiledPattern = patternCache.computeIfAbsent(
-            fieldName + ":" + pattern, Pattern::compile
-        );
+        // 从缓存获取或编译正则 - 使用 pattern 作为 key，而不是 fieldName + ":" + pattern
+        Pattern compiledPattern = patternCache.computeIfAbsent(pattern, Pattern::compile);
 
         String strValue = value.toString().trim();
-        if (!compiledPattern.matcher(strValue).matches()) {
+
+        boolean matches = compiledPattern.matcher(strValue).matches();
+
+        if (!matches) {
+            StringBuilder hexDump = new StringBuilder();
+            for (char c : strValue.toCharArray()) {
+                hexDump.append(String.format("%04X ", (int) c));
+            }
+            log.warn("[DEBUG] 字段={}, 值='{}' (len={}), hex=[{}], pattern='{}', matches={}",
+                    fieldName, strValue, strValue.length(), hexDump.toString().trim(), pattern, matches);
+
             result.addError(String.format(
                 "[%s] 值'%s'不符合格式要求：%s",
                 fieldName, strValue, rule.getDescription()
