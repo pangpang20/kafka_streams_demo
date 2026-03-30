@@ -6,7 +6,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Properties;
+import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 
 /**
@@ -51,6 +57,7 @@ public class ConfigurableConsumer {
         String configDir;
         String schemaFile;
         String rulesFile;
+        String taskId;
         boolean help;
 
         boolean hasConfig() {
@@ -183,6 +190,10 @@ public class ConfigurableConsumer {
                 System.out.println("使用命令行指定的 Topic: " + parsedArgs.topic);
             }
 
+            // 生成或使用命令行指定的 taskId
+            String taskId = parsedArgs.taskId != null ? parsedArgs.taskId : UUID.randomUUID().toString();
+            System.out.println("Task ID: " + taskId);
+
             // 加载 schema 和 rules
             TableSchemaConfigLoader schemaConfig = new TableSchemaConfigLoader(schemaConfigPath);
             ValidationRuleConfigLoader ruleConfig = new ValidationRuleConfigLoader(ruleConfigPath);
@@ -197,9 +208,9 @@ public class ConfigurableConsumer {
             schemaConfig.printConfig();
             ruleConfig.printConfig();
 
-            // 4. 构建拓扑
+            // 4. 构建拓扑（传入 taskId）
             ConfigurableTopology topology = new ConfigurableTopology(
-                    appConfig, ruleConfig, connectionConfig, schemaConfig
+                    appConfig, ruleConfig, connectionConfig, schemaConfig, taskId
             );
 
             // 5. 获取 Kafka 配置
@@ -221,6 +232,9 @@ public class ConfigurableConsumer {
             // 9. 启动 Streams 应用
             System.out.println("\n启动 Kafka Streams 应用...");
             topology.start(streamsProps);
+
+            // 保存 taskId 到文件（供 status.sh 使用）
+            saveTaskIdToFile(taskId, appConfig.getAppName());
 
             // 10. 等待关闭信号
             try {
@@ -289,6 +303,15 @@ public class ConfigurableConsumer {
                     }
                     break;
 
+                case "--task-id":
+                    if (i + 1 < args.length) {
+                        parsedArgs.taskId = args[++i];
+                    } else {
+                        System.err.println("错误：--task-id 需要参数");
+                        System.exit(1);
+                    }
+                    break;
+
                 case "--help":
                 case "-h":
                     parsedArgs.help = true;
@@ -320,6 +343,7 @@ public class ConfigurableConsumer {
         System.out.println("  --config-dir, -c <dir_path>  指定配置目录，自动加载 schemas/ 和 rules/");
         System.out.println("  --schema, -s <file_path>     指定表结构配置文件");
         System.out.println("  --rules, -r <file_path>      指定验证规则配置文件");
+        System.out.println("  --task-id <id>               指定任务 ID（不指定则自动生成 UUID）");
         System.out.println("  --help, -h                   显示帮助信息");
         System.out.println();
         System.out.println("示例:");
@@ -332,6 +356,9 @@ public class ConfigurableConsumer {
         System.out.println("  # 方式 3：分别指定 schema 和 rules 文件");
         System.out.println("  java -jar consumer-new.jar --schema baseinfo.yaml --rules baseinfo-rules.yaml");
         System.out.println();
+        System.out.println("  # 方式 4：指定 task-id（用于跟踪任务状态）");
+        System.out.println("  java -jar consumer-new.jar --task-id my-task-001 --config-dir /path/to/config");
+        System.out.println();
         System.out.println("配置目录结构:");
         System.out.println("  config/");
         System.out.println("  ├── schemas/              # 表结构配置目录");
@@ -339,5 +366,34 @@ public class ConfigurableConsumer {
         System.out.println("  └── rules/                # 验证规则配置目录");
         System.out.println("      └── baseinfo-rules.yaml");
         System.out.println();
+        System.out.println("查看任务状态:");
+        System.out.println("  ./status.sh              # 查看当前运行任务状态");
+        System.out.println("  ./status.sh <task-id>    # 查看指定任务状态");
+        System.out.println();
+    }
+
+    /**
+     * 保存 taskId 到文件
+     */
+    private static void saveTaskIdToFile(String taskId, String appName) {
+        try {
+            // 创建任务状态目录
+            Path taskDir = Paths.get(".kafka_tasks");
+            if (!Files.exists(taskDir)) {
+                Files.createDirectories(taskDir);
+            }
+
+            // 保存 taskId 到文件
+            Path taskFile = taskDir.resolve(appName + ".task");
+            try (FileWriter writer = new FileWriter(taskFile.toFile())) {
+                writer.write("TASK_ID=" + taskId + "\n");
+                writer.write("APP_NAME=" + appName + "\n");
+                writer.write("START_TIME=" + System.currentTimeMillis() + "\n");
+                writer.write("PID=" + ProcessHandle.current().pid() + "\n");
+            }
+            log.info("任务信息已保存到：{}", taskFile.toAbsolutePath());
+        } catch (IOException e) {
+            log.warn("保存任务信息失败：{}", e.getMessage());
+        }
     }
 }

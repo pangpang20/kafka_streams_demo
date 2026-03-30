@@ -12,7 +12,10 @@ import org.apache.kafka.streams.kstream.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.Instant;
 import java.util.Properties;
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * 可配置 Kafka Streams 拓扑构建器
@@ -26,12 +29,123 @@ public class ConfigurableTopology {
 
     private static final Logger log = LoggerFactory.getLogger(ConfigurableTopology.class);
 
+    /**
+     * 任务状态枚举
+     */
+    public enum TaskState {
+        INIT("初始化"),
+        STARTING("启动中"),
+        RUNNING("运行中"),
+        REBALANCING("重平衡中"),
+        ERROR("错误"),
+        STOPPING("停止中"),
+        STOPPED("已停止");
+
+        private final String description;
+
+        TaskState(String description) {
+            this.description = description;
+        }
+
+        public String getDescription() {
+            return description;
+        }
+    }
+
+    /**
+     * 任务运行时状态
+     */
+    public static class TaskStatus {
+        private final String taskId;
+        private TaskState state;
+        private final long startTime;
+        private long endTime;
+        private String errorMessage;
+        private final AtomicLong processedCount;
+        private final AtomicLong validCount;
+        private final AtomicLong invalidCount;
+
+        public TaskStatus(String taskId) {
+            this.taskId = taskId;
+            this.state = TaskState.INIT;
+            this.startTime = System.currentTimeMillis();
+            this.endTime = 0;
+            this.processedCount = new AtomicLong(0);
+            this.validCount = new AtomicLong(0);
+            this.invalidCount = new AtomicLong(0);
+        }
+
+        public String getTaskId() {
+            return taskId;
+        }
+
+        public TaskState getState() {
+            return state;
+        }
+
+        public void setState(TaskState state) {
+            this.state = state;
+        }
+
+        public long getStartTime() {
+            return startTime;
+        }
+
+        public long getEndTime() {
+            return endTime;
+        }
+
+        public void setEndTime(long endTime) {
+            this.endTime = endTime;
+        }
+
+        public String getErrorMessage() {
+            return errorMessage;
+        }
+
+        public void setErrorMessage(String errorMessage) {
+            this.errorMessage = errorMessage;
+        }
+
+        public long getProcessedCount() {
+            return processedCount.get();
+        }
+
+        public void incrementProcessedCount() {
+            processedCount.incrementAndGet();
+        }
+
+        public long getValidCount() {
+            return validCount.get();
+        }
+
+        public void incrementValidCount() {
+            validCount.incrementAndGet();
+        }
+
+        public long getInvalidCount() {
+            return invalidCount.get();
+        }
+
+        public void incrementInvalidCount() {
+            invalidCount.incrementAndGet();
+        }
+
+        public long getRunningTime() {
+            if (endTime > 0) {
+                return endTime - startTime;
+            }
+            return System.currentTimeMillis() - startTime;
+        }
+    }
+
     private final AppConfigLoader appConfig;
     private final MultiTableDataProcessor processor;
     private final ObjectMapper objectMapper;
     private final MultiTableDataWriter dataWriter;
 
     private KafkaStreams streams;
+    private TaskStatus taskStatus;
 
     /**
      * 构造函数
@@ -40,6 +154,17 @@ public class ConfigurableTopology {
                                  ValidationRuleConfigLoader ruleConfig,
                                  ConnectionConfigLoader connectionConfig,
                                  TableSchemaConfigLoader schemaConfig) {
+        this(appConfig, ruleConfig, connectionConfig, schemaConfig, UUID.randomUUID().toString());
+    }
+
+    /**
+     * 构造函数（带 taskId）
+     */
+    public ConfigurableTopology(AppConfigLoader appConfig,
+                                 ValidationRuleConfigLoader ruleConfig,
+                                 ConnectionConfigLoader connectionConfig,
+                                 TableSchemaConfigLoader schemaConfig,
+                                 String taskId) {
         this.appConfig = appConfig;
         this.processor = new MultiTableDataProcessor(ruleConfig);
 
@@ -51,6 +176,7 @@ public class ConfigurableTopology {
         }
 
         this.objectMapper = new ObjectMapper();
+        this.taskStatus = new TaskStatus(taskId);
 
         // 注册已知表
         if (schemaConfig.getTables() != null) {
@@ -60,6 +186,7 @@ public class ConfigurableTopology {
         }
 
         log.info("ConfigurableTopology 初始化完成（多表模式）");
+        log.info("  Task ID: {}", taskId);
         log.info("  源 Topic: {}", appConfig.getSourceTopic());
         log.info("  写入 Topic: {}", appConfig.isWriteToTopic());
         log.info("  写入 OceanBase: {}", appConfig.isWriteToOceanbase());
@@ -102,6 +229,14 @@ public class ConfigurableTopology {
             if (result == null) {
                 return;
             }
+            // 更新统计计数
+            taskStatus.incrementProcessedCount();
+            if (result.isSuccess()) {
+                taskStatus.incrementValidCount();
+            } else {
+                taskStatus.incrementInvalidCount();
+            }
+
             String tableName = result.getTableName() != null ? result.getTableName() : "unknown";
             if (result.isSuccess()) {
                 log.info("[PASS] key={}, opcode={}, table={}",
@@ -183,25 +318,55 @@ public class ConfigurableTopology {
      */
     public void start(Properties props) {
         log.info("启动 Kafka Streams 应用...");
+        log.info("Task ID: {}", taskStatus.getTaskId());
 
-        StreamsBuilder builder = buildTopology();
-        streams = new KafkaStreams(builder.build(), new StreamsConfig(props));
+        taskStatus.setState(TaskState.STARTING);
 
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            log.info("收到关闭信号，正在停止 Streams 应用...");
-            streams.close();
-            if (dataWriter != null) {
-                dataWriter.close();
-            }
-            log.info("Streams 应用已停止");
-        }));
+        try {
+            StreamsBuilder builder = buildTopology();
+            streams = new KafkaStreams(builder.build(), new StreamsConfig(props));
 
-        streams.start();
-        log.info("Kafka Streams 应用已启动");
-        log.info("Application ID: {}", appConfig.getAppName());
-        log.info("State Directory: {}", appConfig.getApp().getStateDir());
+            // 添加状态监听
+            streams.setStateListener((newState, oldState) -> {
+                log.info("状态变化：{} -> {}", oldState, newState);
+                if (newState == KafkaStreams.State.RUNNING) {
+                    taskStatus.setState(TaskState.RUNNING);
+                } else if (newState == KafkaStreams.State.REBALANCING) {
+                    taskStatus.setState(TaskState.REBALANCING);
+                } else if (newState == KafkaStreams.State.NOT_RUNNING) {
+                    taskStatus.setState(TaskState.STOPPED);
+                    taskStatus.setEndTime(System.currentTimeMillis());
+                }
+            });
 
-        printRuntimeInfo();
+            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                log.info("收到关闭信号，正在停止 Streams 应用...");
+                taskStatus.setState(TaskState.STOPPING);
+                stop();
+                taskStatus.setState(TaskState.STOPPED);
+                taskStatus.setEndTime(System.currentTimeMillis());
+                if (dataWriter != null) {
+                    dataWriter.close();
+                }
+                log.info("Streams 应用已停止");
+            }));
+
+            streams.start();
+            taskStatus.setState(TaskState.RUNNING);
+            log.info("Kafka Streams 应用已启动");
+            log.info("Task ID: {}", taskStatus.getTaskId());
+            log.info("Application ID: {}", appConfig.getAppName());
+            log.info("State Directory: {}", appConfig.getApp().getStateDir());
+
+            printRuntimeInfo();
+
+        } catch (Exception e) {
+            log.error("启动失败：{}", e.getMessage(), e);
+            taskStatus.setState(TaskState.ERROR);
+            taskStatus.setErrorMessage(e.getMessage());
+            taskStatus.setEndTime(System.currentTimeMillis());
+            throw new RuntimeException("Kafka Streams 启动失败", e);
+        }
     }
 
     /**
@@ -213,7 +378,8 @@ public class ConfigurableTopology {
                 Thread.sleep(5000);
                 while (streams != null && streams.state() != KafkaStreams.State.NOT_RUNNING) {
                     KafkaStreams.State state = streams.state();
-                    log.info("当前状态：{}", state);
+                    log.info("当前状态：{} | Task ID: {} | 运行时长：{} 秒",
+                            state, taskStatus.getTaskId(), taskStatus.getRunningTime() / 1000);
                     Thread.sleep(30000);
                 }
             } catch (InterruptedException e) {
@@ -237,5 +403,40 @@ public class ConfigurableTopology {
      */
     public KafkaStreams getStreams() {
         return streams;
+    }
+
+    /**
+     * 获取任务状态
+     */
+    public TaskStatus getTaskStatus() {
+        return taskStatus;
+    }
+
+    /**
+     * 获取 Task ID
+     */
+    public String getTaskId() {
+        return taskStatus != null ? taskStatus.getTaskId() : null;
+    }
+
+    /**
+     * 将任务状态转换为 JSON
+     */
+    public String getTaskStatusJson() {
+        if (taskStatus == null) {
+            return "{\"error\": \"任务未初始化\"}";
+        }
+        return String.format(
+            "{\"taskId\":\"%s\",\"state\":\"%s\",\"stateDesc\":\"%s\",\"startTime\":%d,\"runningTime\":%d,\"processedCount\":%d,\"validCount\":%d,\"invalidCount\":%d,\"errorMessage\":%s}",
+            taskStatus.getTaskId(),
+            taskStatus.getState().name(),
+            taskStatus.getState().getDescription(),
+            taskStatus.getStartTime(),
+            taskStatus.getRunningTime(),
+            taskStatus.getProcessedCount(),
+            taskStatus.getValidCount(),
+            taskStatus.getInvalidCount(),
+            taskStatus.getErrorMessage() != null ? "\"" + taskStatus.getErrorMessage() + "\"" : "null"
+        );
     }
 }

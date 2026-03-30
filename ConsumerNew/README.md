@@ -13,6 +13,7 @@
 - **灵活输出**：可选择是否写入 Kafka Topic 和 OceanBase 数据库
 - **自动建表**：支持自动在 OceanBase 中创建目标表
 - **命令行参数**：支持启动时指定 Topic 和配置文件路径
+- **任务跟踪**：支持 UUID 任务 ID，用于跟踪任务状态
 
 ## 快速开始
 
@@ -64,6 +65,7 @@ config/
 | `--config-dir <path>` | `-c` | 指定配置目录，自动加载 `schemas/` 和 `rules/` | - |
 | `--schema <file>` | `-s` | 指定表结构配置文件 | - |
 | `--rules <file>` | `-r` | 指定验证规则配置文件 | - |
+| `--task-id <id>` | - | 指定任务 ID（用于跟踪任务状态） | 自动生成 UUID |
 | `--help` | `-h` | 显示帮助信息 | - |
 
 ### 使用示例
@@ -88,6 +90,34 @@ config/
 ./stop.sh
 # 或 Ctrl+C
 ```
+
+### 查看任务状态
+
+```bash
+# 查看当前运行任务状态
+./status.sh
+
+# 查看指定任务状态
+./status.sh <task-id>
+
+# 列出所有任务
+./status.sh --list
+
+# 清理已停止的任务
+./status.sh --clean
+```
+
+**任务状态说明：**
+
+| 状态 | 说明 |
+|------|------|
+| INIT | 初始化 |
+| STARTING | 启动中 |
+| RUNNING | 运行中 |
+| REBALANCING | 重平衡中 |
+| ERROR | 错误 |
+| STOPPING | 停止中 |
+| STOPPED | 已停止 |
 
 ## 配置文件说明
 
