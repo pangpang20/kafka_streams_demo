@@ -1,0 +1,30 @@
+# Kafka 和 OceanBase 连接配置文件
+# 使用说明：修改此文件后重启应用生效
+
+kafka:
+  # Bootstrap Servers (支持多个，逗号分隔)
+  bootstrap_servers: "localhost:19091,localhost:19092,localhost:19093"
+
+  # SASL 认证配置
+  security:
+    enabled: true
+    protocol: "SASL_PLAINTEXT"
+    mechanism: "PLAIN"
+    username: "admin"
+    password: "Audaque@123"
+
+oceanbase:
+  # 连接配置
+  host: "localhost"
+  port: 2881
+  username: "root@test"
+  password: "Audaque@123"
+  database: "kafka_quality_check"
+
+  # 连接池配置
+  pool:
+    max_pool_size: 10
+    min_idle: 2
+    connection_timeout_ms: 30000
+    idle_timeout_ms: 600000
+    max_lifetime_ms: 1800000

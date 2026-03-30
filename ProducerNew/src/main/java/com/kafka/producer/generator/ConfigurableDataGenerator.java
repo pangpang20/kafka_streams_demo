@@ -232,7 +232,7 @@ public class ConfigurableDataGenerator {
     }
 
     private String generateRecentTimestamp(Integer daysBack) {
-        if (daysBack == null) daysBack = 365;
+        if (daysBack == null || daysBack <= 0) daysBack = 365;
         long millis = System.currentTimeMillis() - random.nextInt(daysBack * 24 * 60 * 60 * 1000);
         return LocalDateTime.ofInstant(new Date(millis).toInstant(), java.time.ZoneId.systemDefault())
                 .format(DATETIME_FORMATTER);

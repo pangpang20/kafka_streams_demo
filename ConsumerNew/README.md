@@ -91,6 +91,31 @@ config/
 # 或 Ctrl+C
 ```
 
+### 批量操作（大规模部署）
+
+```bash
+# 批量启动 250 个进程（表 1-250）
+./start-all.sh --from 1 --to 250
+
+# 批量启动，指定 Topic 前缀
+./start-all.sh --from 1 --to 250 --prefix mybiz
+
+# 预演模式（不实际启动）
+./start-all.sh --from 1 --to 10 --dry-run
+
+# 批量停止所有进程
+./stop-all.sh
+
+# 批量停止指定范围的进程
+./stop-all.sh --from 1 --to 100
+
+# 启动看门狗（自动重启失败进程）
+./watchdog.sh start
+
+# 查看看门狗状态
+./watchdog.sh status
+```
+
 ### 查看任务状态
 
 ```bash
@@ -100,8 +125,17 @@ config/
 # 查看指定任务状态
 ./status.sh <task-id>
 
-# 列出所有任务
+# 列出所有任务（最多显示 100 个）
 ./status.sh --list
+
+# 只列出运行中的任务（推荐）
+./status.sh --running
+
+# 只列出已停止的任务
+./status.sh --stopped
+
+# 显示任务统计（2000+ 任务推荐）
+./status.sh --count
 
 # 清理已停止的任务
 ./status.sh --clean
@@ -118,6 +152,106 @@ config/
 | ERROR | 错误 |
 | STOPPING | 停止中 |
 | STOPPED | 已停止 |
+
+## 大规模部署（2000+ 独立进程）
+
+### 资源需求
+
+每个独立进程的资源占用估算：
+
+| 资源 | 单进程 | 2000 进程总计 |
+|------|--------|---------------|
+| 堆内存 | 256MB | 512GB |
+| CPU（空闲）| ~0.5-2% | ~40 核心 |
+| 文件描述符 | ~100 | 200,000 |
+| 日志空间 | ~50MB/天 | ~100GB/天 |
+
+### 部署架构建议
+
+使用 8 台 64GB 服务器分散部署：
+
+```
+服务器 1 (64GB):  进程 1-250   →  表 1-250
+服务器 2 (64GB):  进程 251-500 →  表 251-500
+服务器 3 (64GB):  进程 501-750 →  表 501-750
+服务器 4 (64GB):  进程 751-1000 → 表 751-1000
+服务器 5 (64GB):  进程 1001-1250 → 表 1001-1250
+服务器 6 (64GB):  进程 1251-1500 → 表 1251-1500
+服务器 7 (64GB):  进程 1501-1750 → 表 1501-1750
+服务器 8 (64GB):  进程 1751-2000 → 表 1751-2000
+```
+
+### 系统级调优
+
+在每台服务器上执行以下调优：
+
+```bash
+# 1. 增加文件描述符限制
+echo "ulimit -n 65536" >> /etc/profile
+source /etc/profile
+
+# 2. 增加最大进程数
+echo "ulimit -u 4096" >> /etc/profile
+
+# 3. 增加 TCP 端口范围
+echo "net.ipv4.ip_local_port_range = 1024 65535" >> /etc/sysctl.conf
+sysctl -p
+
+# 4. 增加内核参数
+echo "net.core.somaxconn = 65535" >> /etc/sysctl.conf
+echo "net.core.netdev_max_backlog = 65535" >> /etc/sysctl.conf
+sysctl -p
+```
+
+### JVM 参数建议
+
+```bash
+# 每个进程 256MB 堆内存
+export JVM_OPTS="-Xmx256m -Xms128m -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
+
+# 如果内存充足，可增至 512MB
+export JVM_OPTS="-Xmx512m -Xms256m -XX:+UseG1GC"
+```
+
+### 批量启动示例
+
+```bash
+# 在服务器 1 上启动进程 1-250
+./start-all.sh --from 1 --to 250
+
+# 启动看门狗（自动重启失败进程）
+./watchdog.sh start
+
+# 查看任务统计
+./status.sh --count
+```
+
+### 看门狗配置
+
+```bash
+# 编辑 watchdog.sh 配置参数
+export CHECK_INTERVAL=30           # 检查间隔（秒）
+export MAX_RESTART_ATTEMPTS=3      # 最大重启次数
+export RESTART_COOLDOWN=300        # 重启冷却时间（秒）
+
+# 启动看门狗
+./watchdog.sh start
+```
+
+### 故障恢复策略
+
+| 故障类型 | 恢复方式 | 说明 |
+|----------|----------|------|
+| 单进程故障 | 看门狗自动重启 | 30 秒内检测并重启 |
+| 单服务器故障 | 手动迁移 | 在备用服务器重启 250 个进程 |
+| 多服务器故障 | 分批恢复 | 优先恢复核心业务表 |
+
+### 监控建议
+
+1. **进程监控**：使用 `status.sh --count` 定期检查
+2. **日志监控**：集中收集 8 台服务器的日志
+3. **资源监控**：监控内存、CPU、文件描述符使用率
+4. **业务监控**：监控每个表的数据处理延迟
 
 ## 配置文件说明
 

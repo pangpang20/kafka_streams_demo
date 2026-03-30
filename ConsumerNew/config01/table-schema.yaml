@@ -1,0 +1,158 @@
+# 表结构配置文件
+# 使用说明：定义要处理的表及其字段结构
+# 可以定义多个表，每个表有独立的字段配置
+
+tables:
+  # 表 1: baseinfo 人员基本信息表
+  - name: "baseinfo"
+    description: "人员基本信息表"
+
+    # 字段定义
+    fields:
+      - name: "personid"
+        type: "BIGINT"
+        description: "人员 ID"
+        nullable: true
+
+      - name: "idcard"
+        type: "STRING"
+        description: "身份证号"
+        nullable: false
+        is_primary_key: true
+
+      - name: "name"
+        type: "STRING"
+        description: "姓名"
+        nullable: true
+
+      - name: "sex"
+        type: "STRING"
+        description: "性别"
+        nullable: true
+
+      - name: "age"
+        type: "INT"
+        description: "年龄"
+        nullable: true
+
+      - name: "birthdate"
+        type: "TIMESTAMP"
+        description: "出生日期"
+        nullable: true
+
+      - name: "birthplace"
+        type: "STRING"
+        description: "出生地"
+        nullable: true
+
+      - name: "address"
+        type: "STRING"
+        description: "现住址"
+        nullable: true
+
+      - name: "telephone"
+        type: "STRING"
+        description: "电话号码"
+        nullable: true
+
+      - name: "regdatetime"
+        type: "TIMESTAMP"
+        description: "注册时间"
+        nullable: true
+
+      - name: "updatetime"
+        type: "TIMESTAMP"
+        description: "更新时间"
+        nullable: true
+
+      - name: "citizen"
+        type: "DECIMAL"
+        description: "是否公民"
+        nullable: true
+
+      - name: "creditscore"
+        type: "DOUBLE"
+        description: "信用分"
+        nullable: true
+
+      - name: "photo"
+        type: "BYTES"
+        description: "照片"
+        nullable: true
+
+      - name: "bloodtype"
+        type: "STRING"
+        description: "血型"
+        nullable: true
+
+      - name: "housingareas"
+        type: "DECIMAL"
+        description: "住房面积"
+        nullable: true
+
+  # 表 2: orderinfo 订单信息表
+  - name: "orderinfo"
+    description: "订单信息表"
+
+    # 字段定义
+    fields:
+      - name: "orderid"
+        type: "BIGINT"
+        description: "订单 ID"
+        nullable: false
+        is_primary_key: true
+
+      - name: "userid"
+        type: "STRING"
+        description: "用户 ID"
+        nullable: true
+
+      - name: "orderno"
+        type: "STRING"
+        description: "订单号"
+        nullable: true
+
+      - name: "productname"
+        type: "STRING"
+        description: "产品名称"
+        nullable: true
+
+      - name: "quantity"
+        type: "INT"
+        description: "数量"
+        nullable: true
+
+      - name: "price"
+        type: "DECIMAL"
+        description: "单价"
+        nullable: true
+
+      - name: "amount"
+        type: "DECIMAL"
+        description: "总金额"
+        nullable: true
+
+      - name: "orderdate"
+        type: "TIMESTAMP"
+        description: "订单日期"
+        nullable: true
+
+      - name: "shippingaddress"
+        type: "STRING"
+        description: "收货地址"
+        nullable: true
+
+      - name: "status"
+        type: "STRING"
+        description: "订单状态"
+        nullable: true
+
+      - name: "createdtime"
+        type: "TIMESTAMP"
+        description: "创建时间"
+        nullable: true
+
+      - name: "updatetime"
+        type: "TIMESTAMP"
+        description: "更新时间"
+        nullable: true

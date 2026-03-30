@@ -1,0 +1,61 @@
+# 应用级配置文件
+# 使用说明：修改此文件后重启应用生效
+
+app:
+  # 应用名称 (用于 Kafka Streams Application ID)
+  name: "configurable-consumer-app"
+
+  # 状态存储目录
+  state_dir: "/tmp/kafka-streams-consumer"
+
+  # 自动 offset 重置策略 (earliest/latest)
+  auto_offset_reset: "earliest"
+
+# 源表配置（单表模式，多表模式时使用 tables 配置）
+source:
+  # 源表名 (对应 CDC 数据中的 tablename)
+  table_name: "baseinfo"
+
+  # 源 Topic 名称
+  topic: "baseinfo-topic"
+
+  # 是否自动在 OceanBase 中创建目标表
+  auto_create_table: true
+
+  # 是否写入 Kafka Topic
+  write_to_topic: true
+
+  # 正常数据 Topic (仅当 write_to_topic=true 时使用)
+  valid_data_topic: "baseinfo-valid"
+
+  # 异议数据 Topic (仅当 write_to_topic=true 时使用)
+  invalid_data_topic: "baseinfo-invalid"
+
+  # 是否写入 OceanBase 数据库
+  write_to_oceanbase: true
+
+  # 异议数据表名 (自动添加 e_ 前缀)
+  # 例如：baseinfo -> e_baseinfo
+  invalid_table_prefix: "e_"
+
+# 日志配置
+logging:
+  # 日志文件目录
+  dir: "./logs"
+
+  # 是否打印详细日志
+  verbose: true
+
+# 多表配置（支持配置多个表，每个表有自己的 topic）
+# 如果不配置 tables，则使用 source 配置（单表模式）
+tables:
+  - table_name: "baseinfo"
+    topic: "baseinfo-topic"
+    valid_data_topic: "baseinfo-valid"
+    invalid_data_topic: "baseinfo-invalid"
+    enabled: true
+  - table_name: "orderinfo"
+    topic: "orderinfo-topic"
+    valid_data_topic: "orderinfo-valid"
+    invalid_data_topic: "orderinfo-invalid"
+    enabled: true

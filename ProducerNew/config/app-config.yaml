@@ -47,7 +47,9 @@ topic:
 # 如果不配置 tables，则使用 source 配置（单表模式）
 tables:
   - table_name: "baseinfo"
-    topic: "mytopic"
+    topic: "baseinfo-topic"
+    valid_data_topic: "baseinfo-valid"
+    invalid_data_topic: "baseinfo-invalid"
     database_name: "test"
     database_type: "mysql"
     enabled: true
@@ -55,7 +57,9 @@ tables:
     # interval_ms: 2000
   # 可以添加更多表...
   - table_name: "orderinfo"
-    topic: "order-topic"
+    topic: "orderinfo-topic"
+    valid_data_topic: "orderinfo-valid"
+    invalid_data_topic: "orderinfo-invalid"
     database_name: "test"
     database_type: "mysql"
     enabled: true
