@@ -106,14 +106,20 @@ public class MultiTableDataProcessor {
                         "缺少 allfields 或 after_data", "structure", null);
             }
 
-            // 7. 获取表对应的验证器（动态创建或从缓存获取）
+            // 7. 检查是否跳过验证（配置了 skip_validation: true 的表）
+            if (ruleConfigLoader.shouldSkipValidation(tableName)) {
+                log.info("[跳过验证] 表={}, 直接通过", tableName);
+                return ProcessingResult.success(record, key, value);
+            }
+
+            // 8. 获取表对应的验证器（动态创建或从缓存获取）
             ConfigurableValidator validator = getValidator(tableName);
 
-            // 8. 提取字段值进行验证
+            // 9. 提取字段值进行验证
             Map<String, CdcEvent.FieldData> afterData = record.getAllfields().getAfterData();
             Map<String, Object> fieldValues = extractFieldValues(afterData);
 
-            // 9. 执行验证
+            // 10. 执行验证
             ConfigurableValidator.ValidationResult validationResult =
                     validator.validateFields(fieldValues);
 
@@ -126,7 +132,7 @@ public class MultiTableDataProcessor {
                         errorSummary, errorFields, errorSummary);
             }
 
-            // 10. 验证通过
+            // 11. 验证通过
             return ProcessingResult.success(record, key, value);
 
         } catch (Exception e) {

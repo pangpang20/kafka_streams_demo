@@ -47,11 +47,14 @@ public class ValidationRuleConfigLoader {
     public static class TableRuleConfig {
         private String name;
         private List<ValidationRule> rules;
+        private boolean skipValidation;
 
         public String getName() { return name; }
         public void setName(String name) { this.name = name; }
         public List<ValidationRule> getRules() { return rules; }
         public void setRules(List<ValidationRule> rules) { this.rules = rules; }
+        public boolean isSkipValidation() { return skipValidation; }
+        public void setSkipValidation(boolean skipValidation) { this.skipValidation = skipValidation; }
     }
 
     public static class ValidationRule {
@@ -343,6 +346,21 @@ public class ValidationRuleConfigLoader {
             }
         }
         return ruleMap;
+    }
+
+    /**
+     * 检查是否跳过某表的验证
+     */
+    public boolean shouldSkipValidation(String tableName) {
+        refreshIfNeeded();
+        if (tables == null) return false;
+
+        for (TableRuleConfig table : tables) {
+            if (table.getName().equals(tableName)) {
+                return table.isSkipValidation();
+            }
+        }
+        return false;
     }
 
     public void printConfig() {
