@@ -18,6 +18,8 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.apache.kafka.streams.KeyValue;
+
 /**
  * 可配置 Kafka Streams 拓扑构建器
  *
@@ -212,16 +214,17 @@ public class ConfigurableTopology {
 
         log.info("已定义输入流：Topic={}", appConfig.getSourceTopic());
 
-        // 数据处理
-        KStream<String, ProcessingResult> processedStream = sourceStream.mapValues(value -> {
+        // 数据处理（使用 map 而不是 mapValues，以便访问 key）
+        KStream<String, ProcessingResult> processedStream = sourceStream.map((key, value) -> {
             try {
-                return processor.process(null, value);
+                ProcessingResult result = processor.process(key, value);
+                return KeyValue.pair(key, result);
             } catch (Exception e) {
                 log.error("数据处理异常：{}", e.getMessage(), e);
                 ProcessingResult errorResult = new ProcessingResult();
                 errorResult.setSuccess(false);
                 errorResult.setMessage("处理异常：" + e.getMessage());
-                return errorResult;
+                return KeyValue.pair(key, errorResult);
             }
         });
 
