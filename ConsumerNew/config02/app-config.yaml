@@ -19,8 +19,6 @@ logging:
 tables:
   - table_name: "orderinfo"
     topic: "orderinfo-topic"
-    valid_data_topic: "orderinfo-valid"
-    invalid_data_topic: "orderinfo-invalid"
     enabled: true
     # 跳过数据质量验证，直接入库
     skip_validation: true

@@ -19,8 +19,6 @@ logging:
 tables:
   - table_name: "baseinfo"
     topic: "baseinfo-topic"
-    valid_data_topic: "baseinfo-valid"
-    invalid_data_topic: "baseinfo-invalid"
     enabled: true
     # 需要质检
     skip_validation: false
