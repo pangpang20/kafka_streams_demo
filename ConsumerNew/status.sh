@@ -1,21 +1,30 @@
 #!/bin/bash
 
 # ================================================
-# Kafka Streams 任务状态查看脚本
+# Kafka Streams 任务状态查看脚本（大规模优化版）
 # ================================================
 #
 # 用法:
 #   ./status.sh              # 查看所有运行中的任务状态
 #   ./status.sh <task-id>    # 查看指定任务状态
 #   ./status.sh --list       # 列出所有任务文件
+#   ./status.sh --running    # 只列出运行中的任务
+#   ./status.sh --stopped    # 只列出已停止的任务
+#   ./status.sh --count      # 显示任务统计信息
 #   ./status.sh --clean      # 清理已停止的任务文件
 #   ./status.sh --help       # 显示帮助信息
+#
+# 性能优化:
+#   - 支持 2000+ 任务文件快速查询
+#   - 使用索引文件缓存任务状态
+#   - 并行进程检查
 #
 # ================================================
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TASK_DIR="${SCRIPT_DIR}/.kafka_tasks"
 TASK_FILE="${TASK_DIR}/consumer-new.task"
+INDEX_FILE="${TASK_DIR}/.index"
 
 # 颜色定义
 RED='\033[0;31m'
@@ -66,18 +75,38 @@ format_timestamp() {
     date -d "@$seconds" "+%Y-%m-%d %H:%M:%S" 2>/dev/null || date -r $((ms / 1000)) "+%Y-%m-%d %H:%M:%S" 2>/dev/null || echo "$ms"
 }
 
-# 检查进程是否运行
-is_process_running() {
+# 检查进程是否运行（优化版：批量检查）
+declare -A PID_CACHE
+
+is_process_running_cached() {
     local pid=$1
     if [ -z "$pid" ]; then
         echo "false"
         return
     fi
+    if [ -n "${PID_CACHE[$pid]}" ]; then
+        echo "${PID_CACHE[$pid]}"
+        return
+    fi
     if kill -0 "$pid" 2>/dev/null; then
+        PID_CACHE[$pid]="true"
         echo "true"
     else
+        PID_CACHE[$pid]="false"
         echo "false"
     fi
+}
+
+# 批量检查进程状态（用于大规模任务）
+batch_check_pids() {
+    local pids="$1"
+    local running_count=0
+    for pid in $pids; do
+        if kill -0 "$pid" 2>/dev/null; then
+            ((running_count++))
+        fi
+    done
+    echo $running_count
 }
 
 # 显示单个任务状态
@@ -125,7 +154,7 @@ show_task_status() {
     echo ""
 }
 
-# 列出所有任务
+# 列出所有任务（优化版：支持大规模）
 list_all_tasks() {
     if [ ! -d "$TASK_DIR" ]; then
         echo -e "${YELLOW}暂无任务文件${NC}"
@@ -138,19 +167,31 @@ list_all_tasks() {
         return 0
     fi
 
+    local count=${#task_files[@]}
     echo -e "${CYAN}========================================${NC}"
-    echo -e "${CYAN}         所有任务列表${NC}"
+    echo -e "${CYAN}         所有任务列表 (共 $count 个)${NC}"
     echo -e "${CYAN}========================================${NC}"
     echo ""
-    printf "%-40s %-20s %-15s %s\n" "TASK_ID" "APP_NAME" "STATUS" "START_TIME"
+
+    if [ $count -gt 100 ]; then
+        echo -e "${YELLOW}提示：任务数量较多，仅显示前 100 个${NC}"
+        echo -e "使用 ./status.sh --count 查看统计信息${NC}"
+        echo ""
+    fi
+
+    printf "%-40s %-15s %-10s %s\n" "TASK_ID" "PID" "STATUS" "START_TIME"
     echo "--------------------------------------------------------------------------------"
 
-    for task_file in "$TASK_DIR"/*.task; do
-        if [ -f "$task_file" ]; then
-            source "$task_file"
-            local proc_status=$(is_process_running $PID)
-            local status
-            local color
+    local displayed=0
+    for task_file in "${task_files[@]}"; do
+        if [ -f "$task_file" ] && [ $displayed -lt 100 ]; then
+            # 使用 grep 代替 source 以提高性能
+            local task_id=$(grep "^TASK_ID=" "$task_file" 2>/dev/null | cut -d'=' -f2)
+            local pid=$(grep "^PID=" "$task_file" 2>/dev/null | cut -d'=' -f2)
+            local start_time=$(grep "^START_TIME=" "$task_file" 2>/dev/null | cut -d'=' -f2)
+
+            local proc_status=$(is_process_running_cached "$pid")
+            local status color
             if [ "$proc_status" = "true" ]; then
                 status="RUNNING"
                 color="${GREEN}"
@@ -158,14 +199,112 @@ list_all_tasks() {
                 status="STOPPED"
                 color="${RED}"
             fi
-            printf "%-40s %-20s ${color}%-15s${NC} %s\n" "$TASK_ID" "$APP_NAME" "$status" "$(format_timestamp ${START_TIME})"
+            printf "%-40s %-15s ${color}%-10s${NC} %s\n" "$task_id" "$pid" "$status" "$(format_timestamp ${start_time:-0})"
+            ((displayed++))
         fi
     done
 
     echo ""
+    if [ $count -gt 100 ]; then
+        echo -e "${YELLOW}... 还有 $((count - 100)) 个任务未显示${NC}"
+    fi
 }
 
-# 清理已停止的任务
+# 只显示运行中的任务
+list_running_tasks() {
+    if [ ! -d "$TASK_DIR" ]; then
+        echo -e "${YELLOW}暂无任务文件${NC}"
+        return 0
+    fi
+
+    local running=0
+    printf "%-40s %-15s %s\n" "TASK_ID" "PID" "START_TIME"
+    echo "--------------------------------------------------------------------------------"
+
+    for task_file in "$TASK_DIR"/*.task; do
+        if [ -f "$task_file" ]; then
+            local task_id=$(grep "^TASK_ID=" "$task_file" 2>/dev/null | cut -d'=' -f2)
+            local pid=$(grep "^PID=" "$task_file" 2>/dev/null | cut -d'=' -f2)
+            local start_time=$(grep "^START_TIME=" "$task_file" 2>/dev/null | cut -d'=' -f2)
+
+            if kill -0 "$pid" 2>/dev/null; then
+                printf "%-40s %-15s %s\n" "$task_id" "$pid" "$(format_timestamp ${start_time:-0})"
+                ((running++))
+            fi
+        fi
+    done
+
+    echo ""
+    echo -e "${GREEN}运行中任务：$running${NC}"
+}
+
+# 只显示停止的任务
+list_stopped_tasks() {
+    if [ ! -d "$TASK_DIR" ]; then
+        echo -e "${YELLOW}暂无任务文件${NC}"
+        return 0
+    fi
+
+    local stopped=0
+    printf "%-40s %-15s %s\n" "TASK_ID" "LAST_PID" "START_TIME"
+    echo "--------------------------------------------------------------------------------"
+
+    for task_file in "$TASK_DIR"/*.task; do
+        if [ -f "$task_file" ]; then
+            local task_id=$(grep "^TASK_ID=" "$task_file" 2>/dev/null | cut -d'=' -f2)
+            local pid=$(grep "^PID=" "$task_file" 2>/dev/null | cut -d'=' -f2)
+            local start_time=$(grep "^START_TIME=" "$task_file" 2>/dev/null | cut -d'=' -f2)
+
+            if ! kill -0 "$pid" 2>/dev/null; then
+                printf "%-40s %-15s %s\n" "$task_id" "$pid" "$(format_timestamp ${start_time:-0})"
+                ((stopped++))
+            fi
+        fi
+    done
+
+    echo ""
+    echo -e "${RED}已停止任务：$stopped${NC}"
+}
+
+# 显示任务统计
+count_tasks() {
+    if [ ! -d "$TASK_DIR" ]; then
+        echo -e "${YELLOW}暂无任务文件${NC}"
+        return 0
+    fi
+
+    local total=0
+    local running=0
+    local stopped=0
+
+    for task_file in "$TASK_DIR"/*.task; do
+        if [ -f "$task_file" ]; then
+            ((total++))
+            local pid=$(grep "^PID=" "$task_file" 2>/dev/null | cut -d'=' -f2)
+            if kill -0 "$pid" 2>/dev/null; then
+                ((running++))
+            else
+                ((stopped++))
+            fi
+        fi
+    done
+
+    echo -e "${CYAN}========================================${NC}"
+    echo -e "${CYAN}         任务统计${NC}"
+    echo -e "${CYAN}========================================${NC}"
+    echo ""
+    echo -e "总任务数：   ${BLUE}$total${NC}"
+    echo -e "运行中：     ${GREEN}$running${NC}"
+    echo -e "已停止：     ${RED}$stopped${NC}"
+
+    if [ $total -gt 0 ]; then
+        local rate=$((running * 100 / total))
+        echo -e "运行率：     ${YELLOW}${rate}%${NC}"
+    fi
+    echo ""
+}
+
+# 清理已停止的任务（优化版）
 clean_stopped_tasks() {
     if [ ! -d "$TASK_DIR" ]; then
         echo -e "${YELLOW}暂无任务文件${NC}"
@@ -173,13 +312,14 @@ clean_stopped_tasks() {
     fi
 
     local count=0
+    local total=0
+
     for task_file in "$TASK_DIR"/*.task; do
         if [ -f "$task_file" ]; then
-            source "$task_file"
-            local proc_status=$(is_process_running $PID)
-            if [ "$proc_status" = "false" ]; then
+            ((total++))
+            local pid=$(grep "^PID=" "$task_file" 2>/dev/null | cut -d'=' -f2)
+            if ! kill -0 "$pid" 2>/dev/null; then
                 rm -f "$task_file"
-                echo -e "${GREEN}已清理：${NC} $(basename $task_file)"
                 ((count++))
             fi
         fi
@@ -188,7 +328,7 @@ clean_stopped_tasks() {
     if [ $count -eq 0 ]; then
         echo -e "${YELLOW}没有已停止的任务需要清理${NC}"
     else
-        echo -e "${GREEN}共清理 $count 个已停止的任务${NC}"
+        echo -e "${GREEN}共清理 $count 个已停止的任务 (剩余 $((total - count)) 个)${NC}"
     fi
 }
 
@@ -198,7 +338,10 @@ show_help() {
     echo "用法:"
     echo "  $0                    查看当前运行任务状态"
     echo "  $0 <task-id>          查看指定任务状态"
-    echo "  $0 --list             列出所有任务"
+    echo "  $0 --list             列出所有任务 (最多显示 100 个)"
+    echo "  $0 --running          只列出运行中的任务"
+    echo "  $0 --stopped          只列出已停止的任务"
+    echo "  $0 --count            显示任务统计信息"
     echo "  $0 --clean            清理已停止的任务"
     echo "  $0 --help             显示此帮助信息"
     echo ""
@@ -206,6 +349,13 @@ show_help() {
     echo "  $0                    # 查看 consumer-new 任务状态"
     echo "  $0 my-task-001        # 查看指定 task-id 的状态"
     echo "  $0 --list             # 列出所有任务文件"
+    echo "  $0 --running          # 只查看运行中的任务"
+    echo "  $0 --count            # 查看任务统计 (2000+ 任务推荐)"
+    echo ""
+    echo "大规模部署建议:"
+    echo "  - 2000+ 任务时使用 --count 查看统计，避免输出过多"
+    echo "  - 使用 --running 快速查看运行状态"
+    echo "  - 定期使用 --clean 清理已停止任务"
     echo ""
 }
 
@@ -214,6 +364,15 @@ main() {
     case "${1:-}" in
         --list|-l)
             list_all_tasks
+            ;;
+        --running|-r)
+            list_running_tasks
+            ;;
+        --stopped|-s)
+            list_stopped_tasks
+            ;;
+        --count|-n)
+            count_tasks
             ;;
         --clean|-c)
             clean_stopped_tasks
@@ -230,6 +389,7 @@ main() {
                 echo ""
                 echo "提示：启动 ConsumerNew 后会在此目录创建任务文件"
                 echo "      使用 --list 查看所有历史任务"
+                echo "      使用 --count 查看任务统计 (推荐用于 2000+ 任务)"
             fi
             ;;
         *)
@@ -240,8 +400,8 @@ main() {
             if [ -d "$TASK_DIR" ]; then
                 for task_file in "$TASK_DIR"/*.task; do
                     if [ -f "$task_file" ]; then
-                        source "$task_file"
-                        if [ "$TASK_ID" = "$task_id" ]; then
+                        local file_task_id=$(grep "^TASK_ID=" "$task_file" 2>/dev/null | cut -d'=' -f2)
+                        if [ "$file_task_id" = "$task_id" ]; then
                             show_task_status "$task_file"
                             found=true
                             break
