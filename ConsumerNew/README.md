@@ -269,6 +269,141 @@ export RESTART_COOLDOWN=300        # 重启冷却时间（秒）
 3. **资源监控**：监控内存、CPU、文件描述符使用率
 4. **业务监控**：监控每个表的数据处理延迟
 
+---
+
+## 集群部署（多服务器）
+
+### 架构说明
+
+Kafka Streams 自带集群能力，**同一个 `application_id` 的所有实例自动组成集群**：
+
+```
+服务器 1: ConsumerNew (application_id: order-app)
+服务器 2: ConsumerNew (application_id: order-app)  ← 同一个应用
+服务器 3: ConsumerNew (application_id: order-app)
+            ↓
+        共享 Kafka Topic
+            ↓
+        自动负载均衡 + 故障转移
+```
+
+**重要配置**：
+- `application_id`：**必须相同**（用于消费者组协调）
+- `state_dir`：每台服务器**必须唯一**（避免状态冲突）
+- `task-id`：可选，用于区分不同服务器实例
+
+### 集群启动
+
+**前提条件**：配置 SSH 免密登录
+
+```bash
+# 生成分发密钥
+ssh-keygen -t rsa
+
+# 分发到其他节点
+ssh-copy-id root@192.168.1.101
+ssh-copy-id root@192.168.1.102
+ssh-copy-id root@192.168.1.103
+```
+
+**在每台服务器上启动**：
+
+```bash
+# 服务器 1 - 启动 250 个进程
+./start-all.sh --from 1 --to 250
+
+# 服务器 2 - 启动 250 个进程
+./start-all.sh --from 251 --to 500
+
+# 服务器 3 - 启动 250 个进程
+./start-all.sh --from 501 --to 750
+
+# 启动看门狗
+./watchdog.sh start
+```
+
+### 集群状态查询
+
+**方式 1：集群状态查询脚本（推荐）**
+
+```bash
+# 查询所有节点
+./status-cluster.sh
+
+# 显示详细信息
+./status-cluster.sh --detail
+
+# 指定节点查询
+./status-cluster.sh --nodes server1,server2
+```
+
+**输出示例**：
+```
+========================================
+Kafka Streams 集群状态查询
+========================================
+查询节点：server1 (192.168.1.101)
+  server1: 运行中 (总=250, 运行=250, 停止=0)
+查询节点：server2 (192.168.1.102)
+  server2: 运行中 (总=250, 运行=250, 停止=0)
+查询节点：server3 (192.168.1.103)
+  server3: 运行中 (总=250, 运行=250, 停止=0)
+```
+
+**方式 2：单台查询**
+
+```bash
+# 分别登录每台服务器查询
+ssh root@192.168.1.101 "cd /opt/kafka_streams_demo/ConsumerNew && ./status.sh --count"
+ssh root@192.168.1.102 "cd /opt/kafka_streams_demo/ConsumerNew && ./status.sh --count"
+ssh root@192.168.1.103 "cd /opt/kafka_streams_demo/ConsumerNew && ./status.sh --count"
+```
+
+### 集群停止
+
+**逐台停止（推荐，避免服务中断）**：
+
+```bash
+# 步骤 1：停止服务器 1
+ssh root@192.168.1.101 "cd /opt/kafka_streams_demo/ConsumerNew && ./stop-all.sh"
+
+# 等待 30 秒，让 Kafka 重新分配 partition
+
+# 步骤 2：停止服务器 2
+ssh root@192.168.1.102 "cd /opt/kafka_streams_demo/ConsumerNew && ./stop-all.sh"
+
+# 步骤 3：停止服务器 3
+ssh root@192.168.1.103 "cd /opt/kafka_streams_demo/ConsumerNew && ./stop-all.sh"
+```
+
+**停止时的 Partition 重新分配**：
+```
+初始状态（3 台服务器，6 个 partition）：
+服务器 1: partition-0, partition-1
+服务器 2: partition-2, partition-3
+服务器 3: partition-4, partition-5
+
+停止服务器 1 后：
+服务器 2: partition-0, partition-1, partition-2, partition-3  ← 自动接管
+服务器 3: partition-4, partition-5
+
+重启服务器 1 后：
+服务器 1: partition-0, partition-1  ← 自动恢复
+服务器 2: partition-2, partition-3
+服务器 3: partition-4, partition-5
+```
+
+### 集群配置清单
+
+| 配置项 | 服务器 1 | 服务器 2 | 服务器 3 | 说明 |
+|--------|---------|---------|---------|------|
+| `application_id` | order-app | order-app | order-app | 必须相同 |
+| `state_dir` | /tmp/streams-1 | /tmp/streams-2 | /tmp/streams-3 | 必须唯一 |
+| 进程范围 | 1-250 | 251-500 | 501-750 | 不重叠 |
+| JMX 端口 | 9999 | 9999 | 9999 | 可选，用于监控 |
+
+---
+
 ## 配置文件说明
 
 ConsumerNew 有四个配置文件，都在 `src/main/resources/` 目录下：
