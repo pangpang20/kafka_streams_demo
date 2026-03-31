@@ -22,3 +22,5 @@ tables:
     enabled: true
     # 跳过数据质量验证，直接入库
     skip_validation: true
+    # 自动建表
+    auto_create_table: true
